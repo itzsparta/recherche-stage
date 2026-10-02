@@ -159,10 +159,11 @@ des propositions :
 
 - Tout reste en local : base SQLite et fichiers sous `donnees/` (exclus de git).
 - Données transmises à des tiers : le profil et l'offre à l'API du
-  fournisseur choisi (Anthropic ou Google) pour chaque étape LLM. Sur l'offre
-  gratuite de l'API Gemini, Google peut utiliser les contenus pour améliorer
-  ses produits : préférer une clé liée à un compte de facturation ; les candidatures au destinataire choisi. Retirer du CV ce
-  qui n'est pas utile (date de naissance, adresse complète, photo).
+  fournisseur choisi (Anthropic ou Google) pour chaque étape LLM ; les
+  candidatures au destinataire choisi. Retirer du CV ce qui n'est pas utile
+  (date de naissance, adresse complète, photo).
+- Sur l'offre gratuite de l'API Gemini, Google peut utiliser les contenus pour
+  améliorer ses produits : préférer une clé liée à un compte de facturation.
 - L'annuaire ne conserve que des données d'entreprise, jamais les dirigeants.
 - `rs rgpd export` exporte tout ; `rs rgpd purger` supprime les dossiers
   terminés depuis plus de `conservation_mois` (12 par défaut).
