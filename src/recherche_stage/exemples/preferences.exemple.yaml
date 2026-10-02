@@ -1,0 +1,22 @@
+# Préférences et critères de recherche (lus par l'agent Profil).
+type_stage: "stage de fin d'études en maintenance industrielle"
+disponibilite: {du: 2027-04-06, au: 2027-06-25}
+duree_mois: {min: 2, max: 3}
+deadline: 2027-02-15            # au-delà : plus de nouvelles candidatures
+
+# Critères durs : une offre qui les viole est éliminée.
+lieux: ["Boulogne-sur-Mer", "Calais", "Dunkerque", "Lille", "62", "59"]
+teletravail_complet_accepte: false
+gratification_min: null
+entreprises_exclues: []
+mots_exclus: ["commercial", "vente", "téléprospection"]
+
+# Requêtes de veille.
+requetes: ["maintenance industrielle", "génie industriel", "GIM"]
+entreprises_prioritaires: []    # validation humaine toujours requise pour celles-ci
+
+# Critères souples pondérés (poids relatifs, normalisés par l'agent Profil).
+criteres_souples:
+  - {nom: domaine, type: mots_cles, valeurs: [maintenance, fiabilité, GMAO, énergie, ferroviaire], poids: 3}
+  - {nom: secteur, type: secteur, valeurs: [énergie, transport, maritime], poids: 2}
+  - {nom: proximite, type: lieu_prefere, valeurs: [Boulogne-sur-Mer, Calais], poids: 1}

@@ -1,0 +1,31 @@
+[project]
+name = "recherche-stage"
+version = "1.0.0"
+description = "Systeme multi-agents de recherche de stage : veille, scoring, redaction, critique, envoi, suivi, apprentissage"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=1.11",
+    "pydantic>=2.8",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+pdf = ["pypdf>=4.0"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+rs = "recherche_stage.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
+
+[tool.setuptools.package-data]
+recherche_stage = ["exemples/*.yaml", "exemples/*.csv"]

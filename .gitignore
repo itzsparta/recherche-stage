@@ -1,0 +1,15 @@
+# Donnees personnelles (RGPD) : ne jamais committer
+donnees/
+config.yaml
+profil.yaml
+preferences.yaml
+*.db
+*.eml
+
+# Outillage
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+imports/
+export_rgpd.json

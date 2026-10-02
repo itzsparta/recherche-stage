@@ -1,0 +1,62 @@
+# Configuration du système. Les secrets ne s'écrivent jamais ici : seulement le
+# NOM des variables d'environnement qui les contiennent.
+# Clé API Claude : variable ANTHROPIC_API_KEY (ou `ant auth login`).
+
+donnees: donnees            # base SQLite et fichiers générés (local, RGPD)
+conservation_mois: 12       # rs rgpd purger supprime les dossiers terminés plus anciens
+
+orchestrateur:
+  candidatures_max_par_semaine: 15
+  seuil_score_minimum: 60
+  iterations_critique_max: 2
+  appels_api_max_par_semaine: 600
+  seuil_confiance: 0.5
+
+autonomie:                  # levée de la validation humaine avant envoi
+  fenetre: 30
+  taux_requis: 0.95
+
+llm:
+  modele: claude-opus-5-5
+  modele_critique: claude-opus-5-5
+  effort: medium
+  effort_critique: high
+  recherche_web: true       # enquête entreprise par recherche web sourcée
+
+critique:
+  seuil_validation: 80
+  seuil_renvoi: 60
+  fautes_max: 2
+  # languagetool_url: http://localhost:8081   # correcteur local (optionnel)
+
+sources:
+  import_fichier: true      # JobTeaser, Indeed, WTTJ : déposer CSV/JSON dans imports/
+  dossier_imports: imports
+  ats: []                   # sites carrière via API publique de leur ATS, par exemple :
+  #  - {nom: "Exemple SA", ats: greenhouse, identifiant: exemple}
+  #  - {nom: "Autre", ats: lever, identifiant: autre}
+  #  - {nom: "Encore", ats: smartrecruiters, identifiant: Encore1}
+  france_travail: false     # API officielle, compte francetravail.io requis
+  france_travail_client_id_env: FT_CLIENT_ID
+  france_travail_secret_env: FT_CLIENT_SECRET
+  annuaire: false           # candidatures spontanées via recherche-entreprises.api.gouv.fr
+  annuaire_codes_naf: []    # ex. ["33.12Z", "35.11Z"]
+  annuaire_departements: [] # ex. ["59", "62"]
+
+envoi:
+  smtp:                     # laisser hote vide : aucun envoi, brouillons seulement
+    hote: ""                # ex. smtp.gmail.com
+    port: 465
+    utilisateur: ""
+    mot_de_passe_env: SMTP_MOT_DE_PASSE   # Gmail : mot de passe d'application
+    expediteur: ""
+  fenetre: {jours: [0, 1, 2, 3], heure_debut: 8, heure_fin: 11}
+
+suivi:
+  imap:
+    hote: ""                # ex. imap.gmail.com
+    port: 993
+    utilisateur: ""
+    mot_de_passe_env: IMAP_MOT_DE_PASSE
+    dossier: INBOX
+  relances_jours: [7, 14]
