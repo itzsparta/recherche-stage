@@ -33,7 +33,7 @@ from . import config as configuration
 from .agents.base import Contexte
 from .agents.profil import AgentProfil
 from .canaux.messagerie import BoiteIMAP, ExpediteurSMTP
-from .llm import ClaudeLLM
+from .llm_gemini import construire_llm
 from .orchestrateur import Orchestrateur
 from .reseau import HttpStandard
 from .sources.annuaire import SourceAnnuaire
@@ -49,7 +49,7 @@ def construire(chemin_config: str) -> tuple[Contexte, Orchestrateur]:
     cfg = configuration.charger(chemin_config)
     cfg.dossier_donnees.mkdir(parents=True, exist_ok=True)
     store = Store(cfg.chemin_base)
-    llm = ClaudeLLM(cfg.llm, store, cfg.orchestrateur.appels_api_max_par_semaine)
+    llm = construire_llm(cfg.llm, store, cfg.orchestrateur.appels_api_max_par_semaine)
     http = HttpStandard()
     ctx = Contexte(store=store, config=cfg, llm=llm, http=http)
 

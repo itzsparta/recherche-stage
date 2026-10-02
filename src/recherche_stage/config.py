@@ -25,6 +25,10 @@ class ParamsAutonomie(BaseModel):
 
 
 class ParamsLLM(BaseModel):
+    # Fournisseur des agents, et du Critique à part : « claude » ou « gemini ».
+    # Un Critique sur un autre fournisseur que le rédacteur est vraiment indépendant.
+    fournisseur: str = "claude"
+    fournisseur_critique: str | None = None  # par défaut : le même que `fournisseur`
     modele: str = "claude-opus-5-5"
     # Spécification : modèle ou prompt distinct du rédacteur. Le prompt l'est
     # toujours ; le modèle peut l'être ici.
@@ -32,6 +36,11 @@ class ParamsLLM(BaseModel):
     effort: str = "medium"
     effort_critique: str = "high"
     recherche_web: bool = True
+    # Gemini (clé dans la variable d'environnement nommée ci-dessous)
+    gemini_modele: str = "gemini-2.5-pro"
+    gemini_modele_critique: str = "gemini-2.5-pro"
+    gemini_cle_env: str = "GEMINI_API_KEY"
+    temperature_critique: float = 0.1  # appliquée par Gemini ; les modèles Claude actuels n'en acceptent pas
 
 
 class ParamsVeille(BaseModel):

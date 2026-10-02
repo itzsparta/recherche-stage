@@ -52,7 +52,7 @@ stateDiagram-v2
 | Mode d'autonomie | `autonomie.py` |
 | Retries, disjoncteur | `resilience.py` |
 | Journal, idempotence, budget | `store.py` (SQLite) |
-| Accès au LLM | `llm.py` (API Claude) |
+| Accès au LLM | `llm.py` (Claude), `llm_gemini.py` (Gemini, routeur) |
 
 ## Installation
 
@@ -62,9 +62,23 @@ Python 3.11 ou plus.
 cd recherche-stage
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # Linux / macOS : source .venv/bin/activate
-pip install -e ".[pdf,dev]"
-$env:ANTHROPIC_API_KEY = "sk-ant-..." # ou : ant auth login
+pip install -e ".[pdf,gemini,dev]"
+$env:ANTHROPIC_API_KEY = "sk-ant-..." # Claude (ou : ant auth login)
+$env:GEMINI_API_KEY = "..."           # Gemini, clé sur aistudio.google.com
 ```
+
+### Choix du modèle : Claude, Gemini ou les deux
+
+Dans `config.yaml`, section `llm` :
+
+| Réglage | Effet |
+|---|---|
+| `fournisseur: claude` | tous les agents sur Claude (défaut) |
+| `fournisseur: gemini` | tous les agents sur Gemini (`gemini_modele`) |
+| `fournisseur: claude` + `fournisseur_critique: gemini` | rédaction par Claude, relecture par Gemini (ou l'inverse) : le Critique ne partage ni le modèle ni les biais du rédacteur |
+
+Avec Gemini, l'Enquête s'appuie sur l'ancrage Google Search et la
+température du Critique (`temperature_critique`, 0,1) est appliquée.
 
 ## Démarrage
 
@@ -144,8 +158,10 @@ des propositions :
 ## RGPD
 
 - Tout reste en local : base SQLite et fichiers sous `donnees/` (exclus de git).
-- Données transmises à des tiers : le profil et l'offre à l'API Claude pour
-  chaque étape LLM ; les candidatures au destinataire choisi. Retirer du CV ce
+- Données transmises à des tiers : le profil et l'offre à l'API du
+  fournisseur choisi (Anthropic ou Google) pour chaque étape LLM. Sur l'offre
+  gratuite de l'API Gemini, Google peut utiliser les contenus pour améliorer
+  ses produits : préférer une clé liée à un compte de facturation ; les candidatures au destinataire choisi. Retirer du CV ce
   qui n'est pas utile (date de naissance, adresse complète, photo).
 - L'annuaire ne conserve que des données d'entreprise, jamais les dirigeants.
 - `rs rgpd export` exporte tout ; `rs rgpd purger` supprime les dossiers
@@ -154,9 +170,10 @@ des propositions :
 
 ## Écarts assumés par rapport à la spécification
 
-- **Température 0,1 du Critique** : les modèles Claude actuels n'acceptent
-  plus de paramètre d'échantillonnage. La stabilité vient des questions
-  fermées et du calcul déterministe de la note.
+- **Température 0,1 du Critique** : appliquée quand le Critique tourne sur
+  Gemini. Les modèles Claude actuels n'acceptent plus de paramètre
+  d'échantillonnage : la stabilité vient alors des questions fermées et du
+  calcul déterministe de la note.
 - **CV adapté** : produit en HTML imprimable (`cv_vN.html`). Le PDF d'origine
   est joint, sauf si un export `cv_vN.pdf` existe dans le dossier. La lettre,
   elle, est convertie en PDF automatiquement.
@@ -173,5 +190,6 @@ pytest
 ```
 
 Aucun test n'appelle le réseau ni le LLM : faux LLM, fausses sources, faux
-SMTP/IMAP ; `test_llm.py` vérifie la requête réellement produite par le SDK
-Anthropic contre un serveur local.
+SMTP/IMAP ; `test_llm.py` et `test_llm_gemini.py` vérifient les requêtes
+réellement produites par les SDK Anthropic et google-genai contre un serveur
+local.

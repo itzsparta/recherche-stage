@@ -1,0 +1,77 @@
+"""GeminiLLM contre le vrai SDK google-genai, servi par un faux serveur local."""
+
+import json
+
+import pytest
+from test_llm import Serveur
+
+from recherche_stage.agents.suivi import Classification
+from recherche_stage.config import ParamsLLM
+from recherche_stage.llm import ErreurLLM
+from recherche_stage.llm_gemini import GeminiLLM, RouteurLLM, construire_llm
+from recherche_stage.store import Store
+
+genai = pytest.importorskip("google.genai")
+
+
+def reponse(texte="", fin="STOP", ancrage=None):
+    candidat = {"content": {"role": "model", "parts": [{"text": texte}]}, "finishReason": fin}
+    if ancrage:
+        candidat["groundingMetadata"] = {"groundingChunks": [{"web": {"uri": u, "title": "t"}} for u in ancrage]}
+    return {"candidates": [candidat], "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5}}
+
+
+@pytest.fixture
+def serveur(monkeypatch):
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    s = Serveur()
+    yield s
+    s.http.shutdown()
+
+
+def gemini(serveur, horloge, budget=10):
+    client = genai.Client(api_key="test", http_options={"base_url": serveur.url, "retry_options": {"attempts": 1}})
+    return GeminiLLM(ParamsLLM(fournisseur="gemini"), Store(":memory:", horloge=horloge), budget, client=client)
+
+
+def test_sortie_structuree_et_temperature_du_critique(serveur, horloge):
+    attendu = {"concerne_candidature": True, "categorie": "entretien", "confiance": 0.8, "date_entretien": "", "resume": "rdv"}
+    serveur.reponses.append(reponse(json.dumps(attendu)))
+    llm = gemini(serveur, horloge)
+    assert llm.structurer("suivi", "système", "contenu", Classification, critique=True).categorie == "entretien"
+    entetes, corps = serveur.requetes[0]
+    config = corps["generationConfig"]
+    assert config["responseMimeType"] == "application/json"
+    assert config["responseJsonSchema"]["properties"]["categorie"]["enum"] == ["refus", "entretien", "demande_info", "autre"]
+    assert config["temperature"] == 0.1
+    assert corps["systemInstruction"]["parts"][0]["text"] == "système"
+    assert llm.store.appels_llm_semaine() == 1
+
+
+def test_reponse_bloquee(serveur, horloge):
+    serveur.reponses.append(reponse(fin="SAFETY"))
+    with pytest.raises(ErreurLLM, match="bloquée"):
+        gemini(serveur, horloge).structurer("suivi", "s", "c", Classification)
+
+
+def test_sortie_non_conforme(serveur, horloge):
+    serveur.reponses.append(reponse('{"categorie": "peut-etre"}'))
+    with pytest.raises(ErreurLLM, match="schéma"):
+        gemini(serveur, horloge).structurer("suivi", "s", "c", Classification)
+
+
+def test_recherche_ancree_google_search(serveur, horloge):
+    serveur.reponses.append(reponse("Exemple a ouvert un site.", ancrage=["https://a.example/1", "https://a.example/1", "https://b.example/2"]))
+    texte, urls = gemini(serveur, horloge).rechercher("enquete", "s", "Exemple")
+    assert texte == "Exemple a ouvert un site." and urls == ["https://a.example/1", "https://b.example/2"]
+    assert serveur.requetes[0][1]["tools"] == [{"googleSearch": {}}]
+
+
+def test_routeur_critique_sur_un_autre_fournisseur(horloge, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    llm = construire_llm(ParamsLLM(fournisseur="claude", fournisseur_critique="gemini"), Store(":memory:", horloge=horloge), 10)
+    assert isinstance(llm, RouteurLLM) and isinstance(llm.critique, GeminiLLM)
+    with pytest.raises(ValueError, match="inconnu"):
+        construire_llm(ParamsLLM(fournisseur="mistral"), Store(":memory:", horloge=horloge), 10)

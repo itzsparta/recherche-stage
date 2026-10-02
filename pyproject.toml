@@ -11,6 +11,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pdf = ["pypdf>=4.0"]
+gemini = ["google-genai>=1.30"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]
