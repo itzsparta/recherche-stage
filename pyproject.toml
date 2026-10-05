@@ -29,4 +29,4 @@ testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 
 [tool.setuptools.package-data]
-recherche_stage = ["exemples/*.yaml", "exemples/*.csv"]
+recherche_stage = ["exemples/*.yaml", "exemples/*.csv", "interface.html"]

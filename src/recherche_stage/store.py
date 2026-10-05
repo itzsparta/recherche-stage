@@ -128,7 +128,9 @@ class Store:
     def __init__(self, chemin: str | Path = ":memory:", horloge: Callable[[], datetime] = datetime.now):
         self.chemin = str(chemin)
         self.horloge = horloge
-        self.cx = sqlite3.connect(self.chemin, isolation_level=None)
+        # Un seul fil à la fois par instance (le serveur de `rs interface` traite
+        # les requêtes l'une après l'autre), mais pas forcément celui qui l'a créée.
+        self.cx = sqlite3.connect(self.chemin, isolation_level=None, check_same_thread=False)
         self.cx.row_factory = sqlite3.Row
         if self.chemin != ":memory:":
             self.cx.execute("PRAGMA journal_mode=WAL")

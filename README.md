@@ -123,8 +123,10 @@ rs init                                   # crée config.yaml, preferences.yaml,
 # compléter preferences.yaml (dates, zone, critères) et config.yaml (SMTP, IMAP, sources)
 rs profil --cv cv.pdf --releves releve_S1.pdf releve_S2.pdf
 rs cycle                                  # veille → scoring → enquête → rédaction → critique → brouillon
-rs revue                                  # tout en une commande : chaque élément affiché, réglé d'une touche
-                                          # (valider, corriger dans l'éditeur, rejeter, déposé à la main…)
+rs interface                              # tout dans le navigateur (sous Windows : double-clic sur interface.bat) :
+                                          # lancer un cycle, relire et corriger mail et lettre, valider, rejeter,
+                                          # dépôts à la main. Serveur local (127.0.0.1) : rien ne quitte la machine
+rs revue                                  # la même chose dans le terminal, une touche par élément
 rs file                                   # ce qui attend une décision
 rs voir <id>                              # documents, note du Critique, problèmes relevés
 rs valider <id>                           # ou : éditer mail_vN.txt / lettre_vN.txt, puis rs valider <id> --modifie

@@ -11,6 +11,7 @@
     rs marquer-envoye <id> <preuve>  dépôt manuel effectué
     rs liberer-envoi <id> [--nature relance1]
     rs statut                        tableau de bord
+    rs interface                     interface dans le navigateur : cycle, relecture, validation
     rs revue                         passe la file en revue : valider, corriger, rejeter, déposer
     rs fermer <n°> [note]            retire un élément de rs file (alerte traitée)
     rs reprendre-enquetes            relance l'Enquête des dossiers non rédigés à fiche minimale
@@ -135,6 +136,12 @@ def cmd_voir(args) -> None:
     if dossier is None:
         sys.exit(f"Dossier inconnu : {args.id}")
     print(decrire(ctx, dossier))
+
+
+def cmd_interface(args) -> None:
+    from .interface import Application, servir
+
+    servir(Application(lambda: construire(args.config)), port=args.port, ouvrir_navigateur=not args.sans_navigateur)
 
 
 def cmd_revue(args) -> None:
@@ -294,6 +301,10 @@ def main(argv: list[str] | None = None) -> None:
 
     sous.add_parser("file").set_defaults(func=cmd_file)
     sous.add_parser("revue").set_defaults(func=cmd_revue)
+    p = sous.add_parser("interface")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--sans-navigateur", action="store_true")
+    p.set_defaults(func=cmd_interface)
     sous.add_parser("statut").set_defaults(func=cmd_statut)
     sous.add_parser("reprendre-enquetes").set_defaults(func=cmd_reprendre_enquetes)
 

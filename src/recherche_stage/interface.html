@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recherche de stage</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --fond: #f6f6f3; --carte: #ffffff; --texte: #1d1d1b; --doux: #6b6b66; --bord: #e2e1dc;
+    --accent: #1f5f8b; --accent-texte: #ffffff; --ok: #2e7d4f; --non: #b3412f; --avert: #a86b00;
+    --champ: #fbfbf9; --ombre: 0 1px 2px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #161615; --carte: #1f1f1d; --texte: #ecece8; --doux: #a3a39c; --bord: #33332f;
+      --accent: #6aa9d8; --accent-texte: #0d1a24; --ok: #6cc28f; --non: #e5826f; --avert: #e0a84a;
+      --champ: #191917; --ombre: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fond); color: var(--texte);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 32px 0 12px; }
+  .sous { color: var(--doux); font-size: 13px; }
+  .chiffres { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 18px 0; }
+  .chiffre { background: var(--carte); border: 1px solid var(--bord); border-radius: 10px; padding: 10px 14px; box-shadow: var(--ombre); }
+  .chiffre b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .chiffre span { color: var(--doux); font-size: 13px; }
+  .panneau { background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 16px; box-shadow: var(--ombre); }
+  .ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  label.case { display: inline-flex; align-items: center; gap: 6px; color: var(--doux); font-size: 14px; cursor: pointer; }
+  button { font: inherit; font-size: 14px; border-radius: 8px; padding: 7px 14px; cursor: pointer;
+           border: 1px solid var(--bord); background: var(--carte); color: var(--texte); }
+  button:hover:not(:disabled) { border-color: var(--doux); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.principal { background: var(--accent); color: var(--accent-texte); border-color: var(--accent); font-weight: 600; }
+  button.danger { color: var(--non); }
+  pre.journal { margin: 12px 0 0; max-height: 220px; overflow: auto; background: var(--champ); border: 1px solid var(--bord);
+                border-radius: 8px; padding: 10px; font-size: 12.5px; white-space: pre-wrap; display: none; }
+  .carte { background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: var(--ombre); }
+  .entete { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .entete h3 { margin: 0; font-size: 16px; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; }
+  .badge { font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid var(--bord); color: var(--doux); white-space: nowrap; }
+  .badge.ok { color: var(--ok); border-color: currentColor; }
+  .badge.avert { color: var(--avert); border-color: currentColor; }
+  .question { color: var(--doux); font-size: 13.5px; margin: 8px 0 4px; white-space: pre-wrap; }
+  .remarques { margin: 10px 0 0; padding-left: 18px; font-size: 13.5px; }
+  .remarques li.bloquant { color: var(--non); }
+  .champ { margin-top: 12px; }
+  .champ > span { display: block; font-size: 12.5px; color: var(--doux); margin-bottom: 4px; }
+  input[type=text], textarea { width: 100%; font: inherit; font-size: 14px; color: var(--texte); background: var(--champ);
+                               border: 1px solid var(--bord); border-radius: 8px; padding: 8px 10px; }
+  textarea { resize: vertical; line-height: 1.55; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  details { margin-top: 10px; font-size: 13.5px; }
+  summary { cursor: pointer; color: var(--doux); }
+  details ul { padding-left: 18px; }
+  a { color: var(--accent); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
+  .actions .modifie { font-size: 12.5px; color: var(--avert); display: none; }
+  .depot { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--champ); border: 1px dashed var(--bord); font-size: 14px; }
+  .vide { color: var(--doux); text-align: center; padding: 30px; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: calc(100% - 32px);
+           background: var(--texte); color: var(--fond); padding: 10px 16px; border-radius: 10px; font-size: 14px;
+           opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.visible { opacity: 1; }
+  #toast.erreur { background: var(--non); color: #fff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Recherche de stage</h1>
+  <div class="sous" id="mode"></div>
+
+  <div class="chiffres" id="chiffres"></div>
+
+  <div class="panneau">
+    <div class="ligne">
+      <button class="principal" id="lancer">Lancer un cycle</button>
+      <label class="case"><input type="checkbox" id="suivi"> Lire la boîte mail (réponses, relances)</label>
+      <label class="case"><input type="checkbox" id="envoi" checked> Envoyer les mails validés</label>
+      <span class="sous" id="cycle-etat"></span>
+    </div>
+    <pre class="journal" id="journal"></pre>
+  </div>
+
+  <h2 id="titre-file">À traiter</h2>
+  <div id="file"></div>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const JETON = "__JETON__";
+const NOMS_STATUTS = {
+  collectee: "collectées", filtree: "filtrées", scoree: "notées", enquetee: "enquêtées", redigee: "rédigées",
+  en_critique: "en relecture", validee: "validées", en_attente_humain: "à traiter", envoyee: "envoyées",
+  relancee: "relancées", entretien: "entretiens", refus: "refus", acceptee: "acceptées", abandonnee: "abandonnées", erreur: "en erreur",
+};
+let cycleEnCours = false;
+
+const el = (balise, attrs = {}, ...enfants) => {
+  const n = document.createElement(balise);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const e of enfants.flat()) if (e !== null && e !== undefined && e !== false) n.append(e.nodeType ? e : String(e));
+  return n;
+};
+
+function toast(message, erreur = false) {
+  const t = document.getElementById("toast");
+  t.textContent = message; t.className = "visible" + (erreur ? " erreur" : "");
+  clearTimeout(toast.minuteur); toast.minuteur = setTimeout(() => t.className = "", erreur ? 7000 : 4000);
+}
+
+async function poster(chemin, donnees) {
+  const r = await fetch(chemin, { method: "POST", headers: { "Content-Type": "application/json", "X-Jeton": JETON }, body: JSON.stringify(donnees) });
+  const corps = await r.json();
+  if (!r.ok) throw new Error(corps.erreur || r.statusText);
+  return corps.message;
+}
+
+async function rafraichir() {
+  const etat = await (await fetch("/api/etat")).json();
+  afficherChiffres(etat);
+  afficherCycle(etat.cycle);
+  afficherFile(etat.file);
+  return etat;
+}
+
+function afficherChiffres(etat) {
+  const s = etat.statuts;
+  const a = etat.autonomie;
+  document.getElementById("mode").textContent =
+    `Fournisseur : ${etat.fournisseur} · ` + (a.debloquee ? "envoi automatique débloqué"
+      : `validation humaine avant envoi (${Math.round(a.taux * 100)} % validés tels quels sur ${a.n}/${a.fenetre})`);
+  const tuiles = [
+    [etat.file.length, "à traiter"],
+    [`${etat.envois[0]}/${etat.envois[1]}`, "envois cette semaine"],
+    [(s.envoyee || 0) + (s.relancee || 0), "candidatures parties"],
+    [s.entretien || 0, "entretiens"],
+    [(s.scoree || 0) + (s.enquetee || 0), "en préparation"],
+    [`${etat.appels_llm[0]}/${etat.appels_llm[1]}`, "appels LLM (semaine)"],
+  ];
+  document.getElementById("chiffres").replaceChildren(...tuiles.map(([v, l]) => el("div", { class: "chiffre" }, el("b", {}, v), el("span", {}, l))));
+}
+
+function afficherCycle(c) {
+  cycleEnCours = c.en_cours;
+  document.getElementById("lancer").disabled = c.en_cours;
+  document.querySelectorAll(".carte button").forEach(b => b.disabled = c.en_cours);
+  const journal = document.getElementById("journal");
+  const lignes = [...c.lignes];
+  if (c.rapport) lignes.push("Cycle terminé : " + (Object.entries(c.rapport).map(([k, v]) => `${k} ${v}`).join(", ") || "rien à faire"));
+  if (c.erreur) lignes.push("Erreur : " + c.erreur);
+  journal.style.display = lignes.length ? "block" : "none";
+  journal.textContent = lignes.join("\n");
+  journal.scrollTop = journal.scrollHeight;
+  document.getElementById("cycle-etat").textContent = c.en_cours ? "Cycle en cours… (les actions attendent sa fin)" : "";
+}
+
+function afficherFile(elements) {
+  const conteneur = document.getElementById("file");
+  document.getElementById("titre-file").textContent = `À traiter (${elements.length})`;
+  const cles = new Set(elements.map(e => cle(e)));
+  // Les cartes déjà affichées sont gardées telles quelles : une correction en cours n'est pas perdue.
+  [...conteneur.children].forEach(c => { if (!cles.has(c.dataset.cle)) c.remove(); });
+  const existantes = new Map([...conteneur.children].map(c => [c.dataset.cle, c]));
+  elements.forEach((e, i) => {
+    const carte = existantes.get(cle(e)) || creerCarte(e);
+    if (conteneur.children[i] !== carte) conteneur.insertBefore(carte, conteneur.children[i] || null);
+  });
+  if (!elements.length) conteneur.replaceChildren(el("div", { class: "vide" }, "Rien à traiter. Lance un cycle pour préparer de nouvelles candidatures."));
+  else conteneur.querySelector(".vide")?.remove();
+}
+
+const cle = e => `${e.escalade}:${e.dossier ? e.dossier.etape : ""}`;
+
+function creerCarte(e) {
+  const d = e.dossier;
+  const carte = el("article", { class: "carte" });
+  carte.dataset.cle = cle(e);
+  if (!d) {
+    carte.append(
+      el("div", { class: "entete" }, el("h3", {}, "Alerte"), el("div", { class: "badges" }, el("span", { class: "badge avert" }, e.type))),
+      el("p", { class: "question" }, e.question),
+      el("div", { class: "actions" }, el("button", { onclick: () => agir(carte, { action: "fermer", escalade: e.escalade }) }, "C'est noté, retirer")),
+    );
+    return carte;
+  }
+  const badges = [
+    el("span", { class: "badge" }, d.type === "spontanee" ? "spontanée" : "offre"),
+    el("span", { class: "badge " + (d.score >= 70 ? "ok" : "") }, `score ${Math.round(d.score)}`),
+  ];
+  if (d.critique.iteration) badges.push(el("span", { class: "badge " + (d.critique.note >= 80 ? "ok" : "avert") }, `relecture ${Math.round(d.critique.note)}/100`));
+  if (d.canal === "email") badges.push(el("span", { class: "badge ok" }, `mail → ${d.destinataire}`));
+  else if (d.canal) badges.push(el("span", { class: "badge avert" }, "dépôt à la main"));
+
+  carte.append(el("div", { class: "entete" },
+    el("div", {}, el("h3", {}, d.entreprise), el("div", { class: "sous" }, `${d.intitule} · ${d.lieu}`)),
+    el("div", { class: "badges" }, badges)));
+  carte.append(el("p", { class: "question" }, resume(e)));
+
+  const problemes = d.critique.problemes;
+  if (problemes.length && d.etape !== "depot")
+    carte.append(el("ul", { class: "remarques" }, problemes.map(p => el("li", { class: p.gravite }, `${p.gravite} : ${p.raison}`))));
+
+  const champs = {};
+  if (d.version && d.etape !== "depot") {
+    const lecture = !d.modifiable;
+    champs.objet = el("input", { type: "text", "aria-label": "Objet du mail" }); champs.objet.value = d.objet;
+    champs.mail = el("textarea", { rows: lignes(d.mail, 6), "aria-label": "Mail" }); champs.mail.value = d.mail;
+    carte.append(el("label", { class: "champ" }, el("span", {}, "Objet"), champs.objet), el("label", { class: "champ" }, el("span", {}, "Mail"), champs.mail));
+    if (d.lettre) {
+      champs.lettre = el("textarea", { rows: lignes(d.lettre, 12), "aria-label": "Lettre de motivation" }); champs.lettre.value = d.lettre;
+      carte.append(el("label", { class: "champ" }, el("span", {}, "Lettre de motivation"), champs.lettre));
+    }
+    Object.values(champs).forEach(c => { c.readOnly = lecture; c.addEventListener("input", () => marquer(carte, champs, d)); });
+  }
+  if (d.faits.length)
+    carte.append(el("details", {}, el("summary", {}, `Faits sourcés sur l'entreprise (${d.faits.length})`),
+      el("ul", {}, d.faits.map(f => el("li", {}, f.texte, " — ", el("a", { href: f.source, target: "_blank", rel: "noreferrer" }, "source"))))));
+
+  if (d.etape === "depot") {
+    carte.append(el("div", { class: "depot" },
+      "Aucune adresse mail publique : dépose le CV et la lettre (PDF dans le dossier) sur le site de l'entreprise. ",
+      el("a", { href: d.recherche, target: "_blank", rel: "noreferrer" }, "Chercher sa page carrières ↗")));
+  }
+
+  const actions = el("div", { class: "actions" });
+  const bouton = (texte, classe, fn) => el("button", { class: classe, onclick: fn }, texte);
+  for (const a of e.actions) {
+    if (a === "valider") actions.append(bouton("Valider", "principal", () => agir(carte, { action: "valider", dossier: d.id, ...valeurs(champs) })));
+    if (a === "deposer") actions.append(bouton("C'est déposé", "principal", () => {
+      const preuve = prompt("Où et quand ? (ex. « site carrières, 06/10 »)", "site carrières, " + new Date().toLocaleDateString("fr-FR"));
+      if (preuve !== null) agir(carte, { action: "deposer", dossier: d.id, preuve });
+    }));
+    if (a === "ouvrir") actions.append(bouton("Ouvrir le dossier", "", () => agir(carte, { action: "ouvrir", dossier: d.id }, false)));
+    if (a === "fermer") actions.append(bouton("C'est noté, retirer", "", () => agir(carte, { action: "fermer", escalade: e.escalade })));
+    if (a === "rejeter") actions.append(bouton("Rejeter", "danger", () => {
+      const motif = prompt(`Rejeter ${d.entreprise} ? Motif (facultatif) :`, "");
+      if (motif !== null) agir(carte, { action: "rejeter", dossier: d.id, motif });
+    }));
+  }
+  actions.append(el("span", { class: "modifie" }, "modifié : tes corrections seront enregistrées"));
+  carte.append(actions);
+  return carte;
+}
+
+function resume(e) {
+  const d = e.dossier;
+  if (e.type === "validation_envoi") return d.canal === "email" ? "Prête à partir par mail : relis, corrige si besoin, puis valide." : "Prête : relis, puis valide pour la déposer toi-même.";
+  if (e.type === "depot_manuel") return "Validée : il reste à la déposer sur le site de l'entreprise.";
+  return e.question;
+}
+
+const lignes = (texte, min) => Math.max(min, Math.min(28, Math.ceil((texte || "").length / 90) + (texte || "").split("\n").length));
+const valeurs = champs => Object.fromEntries(Object.entries(champs).map(([k, c]) => [k, c.value]));
+function marquer(carte, champs, d) {
+  const v = valeurs(champs);
+  const modifie = v.objet !== d.objet || v.mail !== d.mail || (champs.lettre && v.lettre !== d.lettre);
+  carte.querySelector(".modifie").style.display = modifie ? "inline" : "none";
+}
+
+async function agir(carte, donnees, retirer = true) {
+  carte.querySelectorAll("button").forEach(b => b.disabled = true);
+  try {
+    toast(await poster("/api/action", donnees));
+    if (retirer) carte.remove();
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    carte.querySelectorAll("button").forEach(b => b.disabled = cycleEnCours);
+    await rafraichir();
+  }
+}
+
+document.getElementById("lancer").addEventListener("click", async () => {
+  try {
+    toast(await poster("/api/cycle", { sans_suivi: !document.getElementById("suivi").checked, sans_envoi: !document.getElementById("envoi").checked }));
+    suivreCycle();
+  } catch (err) { toast(err.message, true); }
+});
+
+async function suivreCycle() {
+  const etat = await rafraichir();
+  if (etat.cycle.en_cours) setTimeout(suivreCycle, 1500);
+  else if (etat.cycle.rapport || etat.cycle.erreur) toast(etat.cycle.erreur ? "Cycle interrompu : voir le journal" : "Cycle terminé", !!etat.cycle.erreur);
+}
+
+rafraichir().then(etat => { if (etat.cycle.en_cours) suivreCycle(); }).catch(err => toast("Serveur injoignable : relancer rs interface", true));
+</script>
+</body>
+</html>
