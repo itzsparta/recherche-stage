@@ -24,8 +24,10 @@ class Serveur:
             def do_POST(self):
                 corps = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 serveur.requetes.append((dict(self.headers), corps))
-                reponse = json.dumps(serveur.reponses.pop(0)).encode()
-                self.send_response(200)
+                donnee = serveur.reponses.pop(0)
+                code = donnee.pop("_statut", 200)
+                reponse = json.dumps(donnee).encode()
+                self.send_response(code)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(reponse)))
                 self.end_headers()
@@ -81,6 +83,13 @@ def test_refus_du_modele(serveur, horloge):
     serveur.reponses.append(message([], stop_reason="refusal"))
     with pytest.raises(ErreurLLM, match="décliné"):
         llm(serveur, horloge).structurer("suivi", "s", "c", Classification)
+
+
+def test_cle_refusee_message_explicite(serveur, horloge):
+    serveur.reponses.append({"_statut": 401, "type": "error",
+                             "error": {"type": "authentication_error", "message": "invalid x-api-key"}})
+    with pytest.raises(ErreurLLM, match="ANTHROPIC_API_KEY"):
+        llm(serveur, horloge).structurer("profil", "s", "c", Classification)
 
 
 def test_budget_hebdomadaire(serveur, horloge):

@@ -44,6 +44,8 @@ class GeminiLLM:
         try:
             reponse = self.client.models.generate_content(model=modele, contents=contenu, config=config)
         except errors.APIError as e:
+            if e.code in (400, 401, 403) and "key" in str(e.message or "").lower():
+                raise ErreurLLM(f"{agent} : clé Gemini refusée ({e.code}). Vérifier {self.params.gemini_cle_env}") from e
             raise ErreurLLM(f"{agent} : appel Gemini en échec ({e.code})") from e
         usage = reponse.usage_metadata
         self.store.compter_appel_llm(

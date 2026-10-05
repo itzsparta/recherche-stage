@@ -83,6 +83,11 @@ class ClaudeLLM:
                 betas=[BETA_FALLBACK],
                 fallbacks="default",
             )
+        except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
+            raise ErreurLLM(
+                f"{agent} : clé Claude refusée ({e.__class__.__name__}). Vérifier ANTHROPIC_API_KEY "
+                "(clé de console.anthropic.com, sans guillemets ni espace) ou passer à `fournisseur: gemini`"
+            ) from e
         except (anthropic.APIConnectionError, anthropic.APIStatusError) as e:
             raise ErreurLLM(f"{agent} : appel LLM en échec ({e.__class__.__name__})") from e
         self._compter(agent, reponse)
