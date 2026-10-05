@@ -55,10 +55,11 @@ class GeminiLLM:
                 raise ErreurLLM(f"{agent} : clé Gemini refusée ({e.code}). Vérifier {self.params.gemini_cle_env}") from e
             if e.code in (429, 503):
                 raise ErreurLLM(
-                    f"{agent} : Gemini surchargé ou quota atteint ({e.code}) malgré 5 essais. "
-                    "Relancer dans quelques minutes"
+                    f"{agent} : Gemini surchargé ou quota atteint ({e.code}) malgré 5 essais "
+                    f"[{modele} : {str(e.message or '')[:200]}]. Relancer dans quelques minutes "
+                    "ou changer gemini_modele dans config.yaml"
                 ) from e
-            raise ErreurLLM(f"{agent} : appel Gemini en échec ({e.code})") from e
+            raise ErreurLLM(f"{agent} : appel Gemini en échec ({e.code}) [{modele} : {str(e.message or '')[:200]}]") from e
         usage = reponse.usage_metadata
         self.store.compter_appel_llm(
             agent, modele, (usage.prompt_token_count or 0) if usage else 0, (usage.candidates_token_count or 0) if usage else 0
