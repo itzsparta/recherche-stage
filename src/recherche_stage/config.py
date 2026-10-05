@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ParamsOrchestrateur(BaseModel):
@@ -100,9 +100,33 @@ class ParamsSuivi(BaseModel):
 
 
 class EntrepriseATS(BaseModel):
+    """Un site carrière. Donner soit `url` (page carrière hébergée par l'ATS),
+    soit `ats` + `identifiant`."""
+
     nom: str
-    ats: str  # greenhouse | lever | smartrecruiters
-    identifiant: str
+    ats: str = ""  # greenhouse | lever | lever_eu | smartrecruiters | workable | ashby | recruitee | personio
+    identifiant: str = ""
+    url: str = ""
+
+    @model_validator(mode="after")
+    def _depuis_url(self):
+        if not (self.ats and self.identifiant):
+            from .sources.ats import detecter_ats
+
+            trouve = detecter_ats(self.url) if self.url else None
+            if trouve is None:
+                raise ValueError(
+                    f"{self.nom} : ATS non reconnu{f' pour {self.url}' if self.url else ''}. "
+                    "Préciser ats et identifiant, ou essayer : rs detecter-ats <url de la page carrière>"
+                )
+            self.ats, self.identifiant = trouve
+        return self
+
+
+class FluxRSS(BaseModel):
+    nom: str  # entreprise ou site qui publie le flux
+    url: str
+    entreprise_fixe: bool = True  # False pour un agrégateur : l'entreprise est lue dans chaque article
 
 
 class ParamsSources(BaseModel):
@@ -116,6 +140,18 @@ class ParamsSources(BaseModel):
     annuaire_codes_naf: list[str] = Field(default_factory=list)
     annuaire_departements: list[str] = Field(default_factory=list)
     annuaire_max: int = 20
+    # Agrégateur Adzuna (API gratuite, clés sur developer.adzuna.com)
+    adzuna: bool = False
+    adzuna_pays: str = "fr"
+    adzuna_app_id_env: str = "ADZUNA_APP_ID"
+    adzuna_app_key_env: str = "ADZUNA_APP_KEY"
+    # Flux RSS/Atom publiés par des sites carrière ou des sites d'offres
+    flux: list[FluxRSS] = Field(default_factory=list)
+    # Alertes mail des plateformes (Indeed, JobTeaser…) lues dans la boîte IMAP du Suivi
+    alertes_mail: bool = False
+    alertes_plateformes: list[str] = Field(default_factory=lambda: ["indeed", "jobteaser", "wttj", "hellowork", "apec"])
+    alertes_dossier: str = ""  # dossier ou libellé IMAP des alertes ; par défaut celui du Suivi
+    alertes_jours: int = 7
 
 
 class Config(BaseModel):

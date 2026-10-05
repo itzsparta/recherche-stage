@@ -35,12 +35,35 @@ critique:
   # languagetool_url: http://localhost:8081   # correcteur local (optionnel)
 
 sources:
-  import_fichier: true      # JobTeaser, Indeed, WTTJ : déposer CSV/JSON dans imports/
+  # --- Sites carrière (API publiques des ATS) ---------------------------------
+  # Le plus simple : coller l'adresse de la page carrière (lien « voir toutes
+  # les offres »). Si l'ATS n'est pas reconnu : rs detecter-ats <url>
+  ats: []
+  #  - {nom: "Exemple SA", url: "https://jobs.lever.co/exemple"}
+  #  - {nom: "Autre SAS", ats: greenhouse, identifiant: autre}
+  # ATS pris en charge : greenhouse, lever, lever_eu, smartrecruiters,
+  # workable, ashby, recruitee, personio.
+  flux: []                  # flux RSS/Atom d'un site carrière ou d'offres
+  #  - {nom: "Exemple SA", url: "https://exemple.fr/carrieres/rss"}
+  #  - {nom: "Site d'offres", url: "https://…/rss", entreprise_fixe: false}
+
+  # --- Indeed, JobTeaser, Welcome to the Jungle, HelloWork, APEC --------------
+  # 1. Sur chaque site, créer une alerte mail « stage » avec tes critères.
+  # 2. Renseigner suivi.imap (plus bas), puis activer :
+  alertes_mail: false
+  alertes_plateformes: [indeed, jobteaser, wttj, hellowork, apec]
+  alertes_dossier: ""       # libellé Gmail des alertes si tu les y ranges, ex. "Alertes"
+  alertes_jours: 7
+  # Export manuel toujours possible : CSV/JSON déposé dans imports/
+  import_fichier: true
   dossier_imports: imports
-  ats: []                   # sites carrière via API publique de leur ATS, par exemple :
-  #  - {nom: "Exemple SA", ats: greenhouse, identifiant: exemple}
-  #  - {nom: "Autre", ats: lever, identifiant: autre}
-  #  - {nom: "Encore", ats: smartrecruiters, identifiant: Encore1}
+
+  # --- Agrégateur Adzuna (clés gratuites sur developer.adzuna.com) ------------
+  adzuna: false
+  adzuna_app_id_env: ADZUNA_APP_ID
+  adzuna_app_key_env: ADZUNA_APP_KEY
+
+  # --- Officiel ----------------------------------------------------------------
   france_travail: false     # API officielle, compte francetravail.io requis
   france_travail_client_id_env: FT_CLIENT_ID
   france_travail_secret_env: FT_CLIENT_SECRET

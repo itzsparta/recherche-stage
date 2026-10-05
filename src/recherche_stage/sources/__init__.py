@@ -1,7 +1,8 @@
 """Sources d'offres. Uniquement des accès autorisés : API publiques ou
-officielles, et fichiers importés par l'utilisateur. Aucun scraping de
-plateforme dont les CGU l'interdisent (LinkedIn, Indeed, Welcome to the
-Jungle, JobTeaser) : leurs offres entrent par import de fichier."""
+officielles, flux RSS, alertes mail reçues par l'utilisateur et fichiers
+qu'il importe. Aucun scraping de plateforme dont les CGU l'interdisent
+(LinkedIn, Indeed, Welcome to the Jungle, JobTeaser) : leurs offres entrent
+par leurs alertes mail ou par import de fichier."""
 
 from __future__ import annotations
 

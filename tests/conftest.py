@@ -62,8 +62,9 @@ class FauxLLM:
 
 
 class FauxHttp:
-    def __init__(self, json_par_url: dict | None = None, mortes: set[str] = frozenset()):
+    def __init__(self, json_par_url: dict | None = None, mortes: set[str] = frozenset(), texte_par_url: dict | None = None):
         self.json_par_url = json_par_url or {}
+        self.texte_par_url = texte_par_url or {}
         self.mortes = mortes
         self.requetes: list[tuple[str, dict | None]] = []
 
@@ -73,6 +74,13 @@ class FauxHttp:
             if motif in url:
                 return reponse
         return {}
+
+    def get_texte(self, url, params=None, entetes=None):
+        self.requetes.append((url, params))
+        for motif, reponse in self.texte_par_url.items():
+            if motif in url:
+                return reponse
+        return ""
 
     def post_form(self, url, donnees, entetes=None):
         self.requetes.append((url, donnees))

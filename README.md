@@ -65,6 +65,7 @@ python -m venv .venv
 pip install -e ".[pdf,gemini,dev]"
 $env:ANTHROPIC_API_KEY = "sk-ant-..." # Claude (ou : ant auth login)
 $env:GEMINI_API_KEY = "..."           # Gemini, clé sur aistudio.google.com
+$env:IMAP_MOT_DE_PASSE = "..."        # lecture des réponses et des alertes (Gmail : mot de passe d'application)
 ```
 
 ### Choix du modèle : Claude, Gemini ou les deux
@@ -95,7 +96,8 @@ rs cycle                                  # envoie les dossiers validés, lit la
 
 Autres commandes : `rs rejeter`, `rs reponse <id> entretien --date 2026-11-03T14:00`,
 `rs marquer-envoye`, `rs liberer-envoi`, `rs statut`, `rs journal [<id>]`,
-`rs rejouer <id> --complet`, `rs bilan [--appliquer]`, `rs rgpd export|purger`.
+`rs rejouer <id> --complet`, `rs bilan [--appliquer]`, `rs rgpd export|purger`,
+`rs detecter-ats <url>`.
 
 Pour un fonctionnement autonome, planifier `rs cycle` deux fois par jour
 (Planificateur de tâches Windows, ou `cron`). Le système ne collecte une
@@ -104,15 +106,35 @@ jeudi (réglable).
 
 ## Sources et CGU
 
-Aucun scraping de plateforme dont les conditions l'interdisent.
+Aucun scraping de plateforme dont les conditions l'interdisent. Tout se règle
+dans la section `sources` de `config.yaml`.
 
-| Source | Accès |
-|---|---|
-| JobTeaser (école), Indeed, Welcome to the Jungle | Import : déposer un CSV ou JSON dans `imports/`, nommé `<source>_….csv` (ex. `jobteaser_octobre.csv`). Exemple : `src/recherche_stage/exemples/offres.exemple.csv` |
-| Sites carrière | API publiques des ATS Greenhouse, Lever, SmartRecruiters (`sources.ats`) |
-| France Travail | API officielle « Offres d'emploi v2 », compte francetravail.io requis (`sources.france_travail`) |
-| Annuaire (candidatures spontanées) | API publique recherche-entreprises.api.gouv.fr, filtrée par codes NAF et départements |
-| LinkedIn | Exclu |
+| Source | Accès | À faire |
+|---|---|---|
+| **Sites carrière** | API publiques des ATS : Greenhouse, Lever, SmartRecruiters, Workable, Ashby, Recruitee, Personio | Ajouter l'entreprise sous `ats:` avec l'adresse de sa page d'offres. `rs detecter-ats <url>` trouve l'ATS à partir de la page carrière de l'entreprise |
+| **Indeed, JobTeaser**, Welcome to the Jungle, HelloWork, APEC | Lecture de **tes alertes mail** dans ta boîte (IMAP) | Créer une alerte « stage » sur chaque site, renseigner `suivi.imap`, puis `alertes_mail: true` |
+| Flux RSS/Atom | Flux publiés par un site carrière ou un site d'offres | Ajouter l'adresse sous `flux:` |
+| Adzuna (agrégateur) | API officielle, gratuite | Clés sur developer.adzuna.com, puis `adzuna: true` |
+| France Travail | API officielle « Offres d'emploi v2 » | Compte francetravail.io, puis `france_travail: true` |
+| Annuaire (candidatures spontanées) | API publique recherche-entreprises.api.gouv.fr, filtrée par codes NAF et départements | `annuaire: true` |
+| Export manuel | CSV ou JSON déposé dans `imports/`, nommé `<source>_….csv` | Exemple : `src/recherche_stage/exemples/offres.exemple.csv` |
+| LinkedIn | Exclu | |
+
+**Alertes mail.** Le LLM repère les offres dans chaque mail d'alerte, puis
+le code ne garde une offre que si son intitulé et son entreprise sont écrits
+dans le mail et que son lien y figure. Chaque mail n'est lu qu'une fois, et le
+Suivi ne le prend pas pour une réponse d'entreprise. Si tu ranges les alertes
+sous un libellé Gmail, indique-le dans `alertes_dossier`.
+
+**Sites carrière sans API.** Workday, Taleo, SuccessFactors, Teamtailor et
+iCIMS n'ont pas d'API publique documentée : `rs detecter-ats` le signale.
+Pour ces entreprises, crée une alerte mail sur leur site carrière ou utilise
+leur flux RSS s'il existe.
+
+**Candidature.** Le système envoie lui-même les candidatures par mail. Les
+formulaires des sites carrière et des plateformes ne sont jamais remplis
+automatiquement : il prépare le CV, la lettre et les réponses dans
+`a_deposer.md`, tu déposes, puis tu lances `rs marquer-envoye`.
 
 Une source qui échoue est retentée (2 s, 8 s, 30 s), son quota passe à la
 source suivante, et après 3 échecs consécutifs le disjoncteur la coupe 24 h et
@@ -159,7 +181,8 @@ des propositions :
 
 - Tout reste en local : base SQLite et fichiers sous `donnees/` (exclus de git).
 - Données transmises à des tiers : le profil et l'offre à l'API du
-  fournisseur choisi (Anthropic ou Google) pour chaque étape LLM ; les
+  fournisseur choisi (Anthropic ou Google) pour chaque étape LLM, ainsi que
+  le texte des mails d'alerte d'offres ; les
   candidatures au destinataire choisi. Retirer du CV ce qui n'est pas utile
   (date de naissance, adresse complète, photo).
 - Sur l'offre gratuite de l'API Gemini, Google peut utiliser les contenus pour

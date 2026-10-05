@@ -15,6 +15,7 @@
     rs rejouer <id>                  entrées de chaque décision d'un dossier
     rs bilan [--appliquer]           bilan d'apprentissage et application des propositions
     rs rgpd export|purger
+    rs detecter-ats <url> [--nom X]  trouve l'ATS d'une page carrière (ligne à copier dans config.yaml)
 """
 
 from __future__ import annotations
@@ -36,8 +37,11 @@ from .canaux.messagerie import BoiteIMAP, ExpediteurSMTP
 from .llm_gemini import construire_llm
 from .orchestrateur import Orchestrateur
 from .reseau import HttpStandard
+from .sources.adzuna import SourceAdzuna
+from .sources.alertes_mail import SourceAlertesMail
 from .sources.annuaire import SourceAnnuaire
-from .sources.ats import SourceATS
+from .sources.ats import SourceATS, ats_sans_api, detecter_ats, detecter_dans_page
+from .sources.flux import SourceFlux
 from .sources.france_travail import SourceFranceTravail
 from .sources.import_fichier import SourceImport
 from .store import Store
@@ -62,6 +66,13 @@ def construire(chemin_config: str) -> tuple[Contexte, Orchestrateur]:
         sources.append(SourceFranceTravail(http, configuration.secret(s.france_travail_client_id_env), configuration.secret(s.france_travail_secret_env)))
     if s.annuaire:
         sources.append(SourceAnnuaire(http, s.annuaire_codes_naf, s.annuaire_departements))
+    if s.adzuna:
+        sources.append(SourceAdzuna(http, configuration.secret(s.adzuna_app_id_env), configuration.secret(s.adzuna_app_key_env), s.adzuna_pays))
+    sources += [SourceFlux(http, flux) for flux in s.flux]
+    if s.alertes_mail:
+        if not cfg.suivi.imap.hote:
+            raise SystemExit("alertes_mail : renseigner d'abord suivi.imap dans config.yaml")
+        sources.append(SourceAlertesMail(ctx, BoiteIMAP(cfg.suivi.imap, s.alertes_dossier)))
 
     expediteur = ExpediteurSMTP(cfg.envoi.smtp) if cfg.envoi.smtp.hote else None
     boite = BoiteIMAP(cfg.suivi.imap) if cfg.suivi.imap.hote else None
@@ -226,6 +237,31 @@ def cmd_rgpd(args) -> None:
         print(f"{n} dossier(s) terminés depuis plus de {ctx.config.conservation_mois} mois supprimés.")
 
 
+def cmd_detecter_ats(args) -> None:
+    from .reseau import ErreurReseau
+
+    trouve = detecter_ats(args.url)
+    page = ""
+    if trouve is None and not ats_sans_api(args.url):
+        http = HttpStandard()
+        try:
+            trouve = detecter_dans_page(http, args.url)
+            page = "" if trouve else http.get_texte(args.url)
+        except ErreurReseau as e:
+            raise SystemExit(f"Page inaccessible : {e}") from e
+    if trouve is None:
+        sans_api = ats_sans_api(args.url) or ats_sans_api(page)
+        if sans_api:
+            print(f"{sans_api} : pas d'API publique. Crée une alerte mail sur le site carrière, ou utilise son flux RSS s'il en a un.")
+        else:
+            print("ATS non reconnu. Essaie l'adresse de la page qui liste les offres, ou crée une alerte mail sur le site.")
+        return
+    ats, identifiant = trouve
+    nom = args.nom or identifiant
+    print("À ajouter dans config.yaml, sous sources.ats :")
+    print(f'  - {{nom: "{nom}", ats: {ats}, identifiant: "{identifiant}"}}')
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="rs", description="Système multi-agents de recherche de stage")
     parser.add_argument("--config", default="config.yaml")
@@ -297,6 +333,11 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("action", choices=["export", "purger"])
     p.add_argument("--sortie")
     p.set_defaults(func=cmd_rgpd)
+
+    p = sous.add_parser("detecter-ats")
+    p.add_argument("url")
+    p.add_argument("--nom", default="")
+    p.set_defaults(func=cmd_detecter_ats)
 
     args = parser.parse_args(argv)
     try:

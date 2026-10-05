@@ -90,10 +90,13 @@ class AgentSuivi(Agent):
         derniere = store.parametre("suivi_derniere_lecture")
         depuis = datetime.fromisoformat(derniere) - timedelta(days=1) if derniere else self.ctx.horloge() - timedelta(days=30)
         traites: list[str] = store.parametre("messages_traites", []) or []
+        # Les alertes d'offres déjà lues par la Veille citent des entreprises
+        # sans être des réponses : ne pas les rattacher par le nom.
+        alertes = set(store.parametre("alertes_traitees", []) or [])
         dossiers = store.lister(SUIVIS)
         n = 0
         for message in self.boite.messages_depuis(depuis):
-            if message.message_id in traites:
+            if message.message_id in traites or message.message_id in alertes:
                 continue
             traites.append(message.message_id)
             dossier = self.rattacher(message, dossiers)

@@ -18,6 +18,8 @@ class ErreurReseau(RuntimeError):
 class Http(Protocol):
     def get_json(self, url: str, params: dict | None = None, entetes: dict | None = None) -> Any: ...
 
+    def get_texte(self, url: str, params: dict | None = None, entetes: dict | None = None) -> str: ...
+
     def post_form(self, url: str, donnees: dict, entetes: dict | None = None) -> Any: ...
 
     def accessible(self, url: str) -> bool: ...
@@ -40,6 +42,11 @@ class HttpStandard:
             url = f"{url}?{urllib.parse.urlencode(params, doseq=True)}"
         corps = self._envoyer(urllib.request.Request(url, headers={"Accept": "application/json", **(entetes or {})}))
         return json.loads(corps or b"null")
+
+    def get_texte(self, url: str, params: dict | None = None, entetes: dict | None = None) -> str:
+        if params:
+            url = f"{url}?{urllib.parse.urlencode(params, doseq=True)}"
+        return self._envoyer(urllib.request.Request(url, headers=entetes or {})).decode("utf-8", errors="replace")
 
     def post_form(self, url: str, donnees: dict, entetes: dict | None = None) -> Any:
         corps = urllib.parse.urlencode(donnees).encode()

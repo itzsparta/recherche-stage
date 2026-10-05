@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Protocol
 
 from ..config import ParamsIMAP, ParamsSMTP, secret
+from ..sources import texte_brut
 
 
 def construire_message(
@@ -76,24 +77,28 @@ class MessageRecu:
     corps: str
     date: datetime
     references: list[str]
+    html: str = ""
 
 
 class Boite(Protocol):
     def messages_depuis(self, depuis: datetime) -> list[MessageRecu]: ...
 
 
+def _partie(message: email.message.Message, type_: str) -> str:
+    for partie in message.walk():
+        if partie.get_content_type() == type_ and not partie.get_filename():
+            charge = partie.get_payload(decode=True) or b""
+            return charge.decode(partie.get_content_charset() or "utf-8", errors="replace")
+    return ""
+
+
 def _corps_texte(message: email.message.Message) -> str:
-    if message.is_multipart():
-        for partie in message.walk():
-            if partie.get_content_type() == "text/plain" and not partie.get_filename():
-                return partie.get_payload(decode=True).decode(partie.get_content_charset() or "utf-8", errors="replace")
-        return ""
-    return message.get_payload(decode=True).decode(message.get_content_charset() or "utf-8", errors="replace")
+    return _partie(message, "text/plain") or texte_brut(_partie(message, "text/html"))
 
 
 class BoiteIMAP:
-    def __init__(self, params: ParamsIMAP):
-        self.params = params
+    def __init__(self, params: ParamsIMAP, dossier: str = ""):
+        self.params = params.model_copy(update={"dossier": dossier}) if dossier else params
 
     def messages_depuis(self, depuis: datetime) -> list[MessageRecu]:
         p = self.params
@@ -118,6 +123,7 @@ class BoiteIMAP:
                         corps=_corps_texte(message),
                         date=date,
                         references=references,
+                        html=_partie(message, "text/html"),
                     )
                 )
         return recus
