@@ -53,8 +53,10 @@ class GeminiLLM:
         except errors.APIError as e:
             if e.code in (400, 401, 403) and "key" in str(e.message or "").lower():
                 raise ErreurLLM(f"{agent} : clé Gemini refusée ({e.code}). Vérifier {self.params.gemini_cle_env}") from e
-            secours = self.params.gemini_modele_secours
-            if e.code in (429, 503) and secours and secours != modele:
+            chaine = self.params.gemini_modele_secours
+            suivants = chaine[chaine.index(modele) + 1:] if modele in chaine else chaine
+            secours = next((m for m in suivants if m != modele), None)
+            if e.code in (429, 503) and secours:
                 # Modèle saturé (fréquent à la sortie d'un modèle) : on bascule plutôt que d'échouer.
                 self.store.journaliser(agent, "llm_secours", details={"modele": modele, "secours": secours, "code": e.code})
                 return self._generer(agent, secours, contenu, config)

@@ -26,7 +26,7 @@ llm:
   recherche_web: true       # enquête entreprise par recherche web sourcée
   gemini_modele: gemini-3.8-flash         # clé : variable GEMINI_API_KEY (aistudio.google.com)
   gemini_modele_critique: gemini-3.8-flash
-  gemini_modele_secours: gemini-2.5-flash  # pris quand le modèle principal est saturé (503/429)
+  gemini_modele_secours: [gemini-3.7-flash, gemini-3.5-flash, gemini-2.5-flash]  # essayés dans l'ordre si saturé (503/429)
   temperature_critique: 0.1               # appliquée par Gemini uniquement
 
 critique:

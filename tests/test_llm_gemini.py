@@ -73,8 +73,19 @@ def test_503_bascule_sur_le_modele_de_secours(serveur, horloge):
     llm = gemini(serveur, horloge)
     assert llm.structurer("suivi", "s", "c", Classification).categorie == "autre"
     assert "gemini-3.8-flash" in serveur.requetes[0][0]["_chemin"]
-    assert "gemini-2.5-flash" in serveur.requetes[1][0]["_chemin"]
+    assert "gemini-3.7-flash" in serveur.requetes[1][0]["_chemin"]
     assert any(e["action"] == "llm_secours" for e in llm.store.journal())
+
+
+def test_chaine_de_secours_complete(serveur, horloge):
+    sature = {"_statut": 503, "error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}}
+    serveur.reponses += [dict(sature) for _ in range(4)]
+    client = genai.Client(api_key="test", http_options={"base_url": serveur.url, "retry_options": {"attempts": 1}})
+    llm = GeminiLLM(ParamsLLM(fournisseur="gemini"), Store(":memory:", horloge=horloge), 10, client=client)
+    with pytest.raises(ErreurLLM, match="surchargé"):
+        llm.structurer("suivi", "s", "c", Classification)
+    modeles = [r[0]["_chemin"].split("/models/")[1].split(":")[0] for r in serveur.requetes]
+    assert modeles == ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-2.5-flash"]
 
 
 def test_503_persistant_message_explicite(serveur, horloge):

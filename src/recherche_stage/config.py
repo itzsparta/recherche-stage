@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ParamsOrchestrateur(BaseModel):
@@ -39,7 +39,15 @@ class ParamsLLM(BaseModel):
     # Gemini (clé dans la variable d'environnement nommée ci-dessous)
     gemini_modele: str = "gemini-3.8-flash"
     gemini_modele_critique: str = "gemini-3.8-flash"
-    gemini_modele_secours: str | None = "gemini-2.5-flash"  # si le modèle principal est saturé (503/429)
+    # Essayés dans l'ordre quand le modèle demandé est saturé (503/429)
+    gemini_modele_secours: list[str] = Field(
+        default_factory=lambda: ["gemini-3.7-flash", "gemini-3.5-flash", "gemini-2.5-flash"]
+    )
+
+    @field_validator("gemini_modele_secours", mode="before")
+    @classmethod
+    def _secours_liste(cls, v):
+        return [] if v is None else [v] if isinstance(v, str) else v
     gemini_cle_env: str = "GEMINI_API_KEY"
     temperature_critique: float = 0.1  # appliquée par Gemini 1.x et 2.x seulement ; Claude et Gemini 3+ la déconseillent
 
