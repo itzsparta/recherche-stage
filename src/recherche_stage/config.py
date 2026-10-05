@@ -48,6 +48,10 @@ class ParamsLLM(BaseModel):
     @classmethod
     def _secours_liste(cls, v):
         return [] if v is None else [v] if isinstance(v, str) else v
+    # Niveau de réflexion des Gemini 3+ (minimal, low, medium, high) : le défaut
+    # de Google est « high », lent ; « low » suffit à extraire et rédiger.
+    gemini_reflexion: str = "low"
+    gemini_reflexion_critique: str = "medium"
     gemini_cle_env: str = "GEMINI_API_KEY"
     temperature_critique: float = 0.1  # appliquée par Gemini 1.x et 2.x seulement ; Claude et Gemini 3+ la déconseillent
 

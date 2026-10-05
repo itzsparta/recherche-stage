@@ -27,6 +27,8 @@ llm:
   gemini_modele: gemini-3.8-flash         # clé : variable GEMINI_API_KEY (aistudio.google.com)
   gemini_modele_critique: gemini-3.8-flash
   gemini_modele_secours: [gemini-3.7-flash, gemini-3.5-flash, gemini-2.5-flash]  # essayés dans l'ordre si saturé (503/429)
+  gemini_reflexion: low              # minimal, low, medium, high (défaut Google : high, plus lent)
+  gemini_reflexion_critique: medium
   temperature_critique: 0.1               # appliquée par Gemini uniquement
 
 critique:

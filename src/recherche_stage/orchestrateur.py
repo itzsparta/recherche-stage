@@ -56,6 +56,7 @@ class Orchestrateur:
         self.envoi = AgentEnvoi(ctx, expediteur)
         self.suivi = AgentSuivi(ctx, boite, expediteur)
         self.apprentissage = AgentApprentissage(ctx, rng)
+        self.progres: Callable[[str], None] = lambda message: None  # avancement, affiché par la CLI
 
     @property
     def store(self):
@@ -119,11 +120,14 @@ class Orchestrateur:
         nouvelles_candidatures = not self._deadline_depassee()
 
         if collecter and nouvelles_candidatures:
+            self.progres("Collecte des offres et cibles…")
             rapport["collectees"] += len(self.veille.executer())
 
         profil, grille = self.ctx.profil(), self.ctx.grille()
         # `filtree` : scoring interrompu par une erreur au cycle précédent, on le reprend.
-        for dossier in self.store.lister([Statut.collectee, Statut.filtree]):
+        a_scorer = self.store.lister([Statut.collectee, Statut.filtree])
+        for i, dossier in enumerate(a_scorer, 1):
+            self.progres(f"Scoring {i}/{len(a_scorer)} : {dossier.offre.entreprise}")
             if self._executer("scoring", dossier, lambda d=dossier: self.scoring.evaluer(d, profil, grille)):
                 rapport[f"scoring:{dossier.statut.value}"] += 1
 
@@ -133,7 +137,9 @@ class Orchestrateur:
                 if d.score.valeur >= seuil and (d.score.confiance >= seuil_confiance or "scoring" in d.valide_humain)
             ]
             candidats.sort(key=lambda d: (d.prioritaire, d.score.valeur), reverse=True)
-            for dossier in candidats[: self.capacite()]:
+            retenus = candidats[: self.capacite()]
+            for i, dossier in enumerate(retenus, 1):
+                self.progres(f"Enquête {i}/{len(retenus)} : {dossier.offre.entreprise}")
                 if self._executer("enquete", dossier, lambda d=dossier: self.enquete.executer(d)):
                     rapport["enquetes"] += 1
 
@@ -141,7 +147,9 @@ class Orchestrateur:
             self._escalader(None, "cv_pdf", "CV PDF introuvable : rs profil --cv-pdf <fichier>. Rédaction suspendue.")
         else:
             # `redigee` / `en_critique` : boucle interrompue par une erreur, reprise au Critique.
-            for dossier in self.store.lister([Statut.enquetee, Statut.redigee, Statut.en_critique]):
+            a_rediger = self.store.lister([Statut.enquetee, Statut.redigee, Statut.en_critique])
+            for i, dossier in enumerate(a_rediger, 1):
+                self.progres(f"Rédaction et critique {i}/{len(a_rediger)} : {dossier.offre.entreprise}")
                 self._rediger_et_critiquer(dossier, rapport)
 
         for dossier in self.store.lister([Statut.validee]):
@@ -159,6 +167,7 @@ class Orchestrateur:
                 rapport["envoyees"] += parti
 
         if suivre:
+            self.progres("Suivi de la boîte mail…")
             resultat = self.suivi.executer()
             rapport["reponses"] += resultat["reponses"]
             rapport["relances"] += resultat["relances"]

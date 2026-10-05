@@ -108,6 +108,7 @@ def cmd_profil(args) -> None:
 
 def cmd_cycle(args) -> None:
     _, orchestrateur = construire(args.config)
+    orchestrateur.progres = lambda message: print(message, flush=True)
     rapport = orchestrateur.cycle(collecter=not args.sans_collecte, envoyer=not args.sans_envoi, suivre=not args.sans_suivi)
     print("Cycle terminé : " + (", ".join(f"{k} {v}" for k, v in sorted(rapport.items())) or "rien à faire"))
     ouvertes = orchestrateur.store.escalades_ouvertes()

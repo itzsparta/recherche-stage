@@ -122,3 +122,37 @@ def test_routeur_critique_sur_un_autre_fournisseur(horloge, monkeypatch):
     assert isinstance(llm, RouteurLLM) and isinstance(llm.critique, GeminiLLM)
     with pytest.raises(ValueError, match="inconnu"):
         construire_llm(ParamsLLM(fournisseur="mistral"), Store(":memory:", horloge=horloge), 10)
+
+
+CLASSE = '{"concerne_candidature": false, "categorie": "autre", "confiance": 0.5, "date_entretien": "", "resume": ""}'
+
+
+def test_niveau_de_reflexion_selon_le_modele(serveur, horloge):
+    serveur.reponses += [reponse(CLASSE), reponse(CLASSE), reponse(CLASSE)]
+    client = genai.Client(api_key="test", http_options={"base_url": serveur.url, "retry_options": {"attempts": 1}})
+    params = ParamsLLM(fournisseur="gemini", gemini_modele_critique="gemini-2.5-flash")
+    llm = GeminiLLM(params, Store(":memory:", horloge=horloge), 10, client=client)
+    llm.structurer("suivi", "s", "c", Classification)
+    llm.structurer("critique", "s", "c", Classification, critique=True)
+    params.gemini_modele_critique = "gemini-3.7-flash"
+    llm.structurer("critique", "s", "c", Classification, critique=True)
+    configs = [corps["generationConfig"] for _, corps in serveur.requetes]
+
+    def niveau(config):  # le SDK l'écrit en snake_case, que l'API accepte
+        reflexion = config["thinkingConfig"]
+        return (reflexion.get("thinkingLevel") or reflexion.get("thinking_level")).lower()
+
+    assert niveau(configs[0]) == "low"
+    assert "thinkingConfig" not in configs[1] and configs[1]["temperature"] == 0.1  # Gemini 2.x
+    assert niveau(configs[2]) == "medium" and "temperature" not in configs[2]
+
+
+def test_modele_sature_evite_aux_appels_suivants(serveur, horloge):
+    serveur.reponses += [{"_statut": 503, "error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}},
+                         reponse(CLASSE), reponse(CLASSE)]
+    llm = gemini(serveur, horloge)
+    llm.structurer("suivi", "s", "c", Classification)
+    llm.structurer("suivi", "s", "c", Classification)
+    chemins = [entetes["_chemin"] for entetes, _ in serveur.requetes]
+    assert len(chemins) == 3
+    assert "gemini-3.8-flash" in chemins[0] and "gemini-3.7-flash" in chemins[1] and "gemini-3.7-flash" in chemins[2]

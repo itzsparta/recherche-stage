@@ -24,6 +24,11 @@ T = TypeVar("T", bound=BaseModel)
 ARRETS_BLOQUES = {"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION"}
 
 
+def _ancien(modele: str) -> bool:
+    """Gemini 1.x ou 2.x : température réglable, pas de niveau de réflexion."""
+    return bool(re.match(r"gemini-[12][.-]", modele))
+
+
 class GeminiLLM:
     def __init__(self, params: ParamsLLM, store: Store, budget_hebdo: int, client=None):
         self.params = params
@@ -38,6 +43,7 @@ class GeminiLLM:
                 http_options={"retry_options": {"attempts": 3, "initial_delay": 2, "max_delay": 30}},
             )
         self.client = client
+        self.satures: set[str] = set()  # modèles saturés pendant cette exécution
 
     def _verifier_budget(self) -> None:
         if self.store.appels_llm_semaine() >= self.budget_hebdo:
@@ -47,17 +53,26 @@ class GeminiLLM:
         from google.genai import errors
 
         self._verifier_budget()
+        chaine = self.params.gemini_modele_secours
+        suivants = chaine[chaine.index(modele) + 1:] if modele in chaine else chaine
+        secours = next((m for m in suivants if m != modele), None)
+        if modele in self.satures and secours:
+            # Déjà saturé à un appel précédent : inutile de reperdre les réessais.
+            return self._generer(agent, secours, contenu, config)
         options = {**config, "automatic_function_calling": {"disable": True}}  # aucun outil Python à appeler
+        niveau = options.pop("_reflexion", None)
+        if not _ancien(modele):
+            options.pop("temperature", None)
+            if niveau:
+                options["thinking_config"] = {"thinking_level": niveau}
         try:
             reponse = self.client.models.generate_content(model=modele, contents=contenu, config=options)
         except errors.APIError as e:
             if e.code in (400, 401, 403) and "key" in str(e.message or "").lower():
                 raise ErreurLLM(f"{agent} : clé Gemini refusée ({e.code}). Vérifier {self.params.gemini_cle_env}") from e
-            chaine = self.params.gemini_modele_secours
-            suivants = chaine[chaine.index(modele) + 1:] if modele in chaine else chaine
-            secours = next((m for m in suivants if m != modele), None)
             if e.code in (429, 503) and secours:
                 # Modèle saturé (fréquent à la sortie d'un modèle) : on bascule plutôt que d'échouer.
+                self.satures.add(modele)
                 self.store.journaliser(agent, "llm_secours", details={"modele": modele, "secours": secours, "code": e.code})
                 return self._generer(agent, secours, contenu, config)
             if e.code in (429, 503):
@@ -89,9 +104,11 @@ class GeminiLLM:
             "max_output_tokens": 16000,
         }
         modele = self.params.gemini_modele_critique if critique else self.params.gemini_modele
+        config["_reflexion"] = self.params.gemini_reflexion_critique if critique else self.params.gemini_reflexion
         # Google déconseille d'abaisser la température des modèles Gemini 3 et
-        # suivants (boucles, raisonnement dégradé) : réservée aux modèles 1.x et 2.x.
-        if critique and re.match(r"gemini-[12][.-]", modele):
+        # suivants (boucles, raisonnement dégradé) : réservée aux modèles 1.x et 2.x,
+        # y compris quand la chaîne de secours y aboutit.
+        if critique:
             config["temperature"] = self.params.temperature_critique
         reponse = self._generer(agent, modele, contenu, config)
         try:
@@ -100,7 +117,12 @@ class GeminiLLM:
             raise ErreurLLM(f"{agent} : sortie Gemini non conforme au schéma") from e
 
     def rechercher(self, agent: str, systeme: str, requete: str) -> tuple[str, list[str]]:
-        config = {"system_instruction": systeme, "tools": [{"google_search": {}}], "max_output_tokens": 16000}
+        config = {
+            "system_instruction": systeme,
+            "tools": [{"google_search": {}}],
+            "max_output_tokens": 16000,
+            "_reflexion": self.params.gemini_reflexion,
+        }
         reponse = self._generer(agent, self.params.gemini_modele, requete, config)
         metadonnees = reponse.candidates[0].grounding_metadata
         urls = [

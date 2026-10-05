@@ -38,7 +38,10 @@ def orchestrateur(ctx):
 
 
 def test_pipeline_complet_avec_porte_humaine(orchestrateur, ctx, horloge):
+    etapes = []
+    orchestrateur.progres = etapes.append
     rapport = orchestrateur.cycle()
+    assert [e.split(" ")[0] for e in etapes] == ["Collecte", "Scoring", "Enquête", "Rédaction", "Suivi"]
     assert rapport["collectees"] == 1 and rapport["enquetes"] == 1
     assert rapport["critique:renvoyer"] == 1 and rapport["critique:valider"] == 1
     assert rapport["brouillons"] == 1 and rapport["bilan"] == 1

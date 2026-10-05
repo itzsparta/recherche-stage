@@ -81,7 +81,12 @@ Dans `config.yaml`, section `llm` :
 Avec Gemini (`gemini-3.8-flash` par défaut), l'Enquête s'appuie sur
 l'ancrage Google Search. La température du Critique (`temperature_critique`,
 0,1) n'est appliquée qu'aux modèles Gemini 1.x et 2.x : Google déconseille de
-l'abaisser à partir de Gemini 3.
+l'abaisser à partir de Gemini 3. Le niveau de réflexion des Gemini 3+ est
+réglé par `gemini_reflexion` (`low`) et `gemini_reflexion_critique` (`medium`) :
+le défaut de Google (`high`) rend chaque appel nettement plus lent. Un modèle
+saturé (503/429) est remplacé par le suivant de `gemini_modele_secours`, et
+n'est plus réessayé jusqu'à la fin de la commande. `rs cycle` affiche son
+avancement étape par étape.
 
 ## Démarrage
 
