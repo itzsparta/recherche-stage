@@ -32,7 +32,11 @@ class GeminiLLM:
         if client is None:
             from google import genai
 
-            client = genai.Client(api_key=secret(params.gemini_cle_env))
+            # Gemini répond souvent 503 (surcharge) ou 429 : le SDK ne réessaie pas par défaut.
+            client = genai.Client(
+                api_key=secret(params.gemini_cle_env),
+                http_options={"retry_options": {"attempts": 5, "initial_delay": 2, "max_delay": 30}},
+            )
         self.client = client
 
     def _verifier_budget(self) -> None:
@@ -43,11 +47,17 @@ class GeminiLLM:
         from google.genai import errors
 
         self._verifier_budget()
+        config = {**config, "automatic_function_calling": {"disable": True}}  # aucun outil Python à appeler
         try:
             reponse = self.client.models.generate_content(model=modele, contents=contenu, config=config)
         except errors.APIError as e:
             if e.code in (400, 401, 403) and "key" in str(e.message or "").lower():
                 raise ErreurLLM(f"{agent} : clé Gemini refusée ({e.code}). Vérifier {self.params.gemini_cle_env}") from e
+            if e.code in (429, 503):
+                raise ErreurLLM(
+                    f"{agent} : Gemini surchargé ou quota atteint ({e.code}) malgré 5 essais. "
+                    "Relancer dans quelques minutes"
+                ) from e
             raise ErreurLLM(f"{agent} : appel Gemini en échec ({e.code})") from e
         usage = reponse.usage_metadata
         self.store.compter_appel_llm(

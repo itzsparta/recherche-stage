@@ -57,6 +57,22 @@ def test_temperature_du_critique_sur_gemini_2(serveur, horloge):
     assert serveur.requetes[0][1]["generationConfig"]["temperature"] == 0.1
 
 
+def test_503_reessaye_puis_reussit(serveur, horloge):
+    erreur = {"_statut": 503, "error": {"code": 503, "message": "The model is overloaded.", "status": "UNAVAILABLE"}}
+    serveur.reponses += [dict(erreur), reponse('{"concerne_candidature": false, "categorie": "autre", "confiance": 0.5, "date_entretien": "", "resume": ""}')]
+    client = genai.Client(api_key="test", http_options={
+        "base_url": serveur.url, "retry_options": {"attempts": 2, "initial_delay": 0.01, "max_delay": 0.01}})
+    llm = GeminiLLM(ParamsLLM(fournisseur="gemini"), Store(":memory:", horloge=horloge), 10, client=client)
+    assert llm.structurer("suivi", "s", "c", Classification).categorie == "autre"
+    assert len(serveur.requetes) == 2
+
+
+def test_503_persistant_message_explicite(serveur, horloge):
+    serveur.reponses.append({"_statut": 503, "error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}})
+    with pytest.raises(ErreurLLM, match="surchargé"):
+        gemini(serveur, horloge).structurer("suivi", "s", "c", Classification)
+
+
 def test_reponse_bloquee(serveur, horloge):
     serveur.reponses.append(reponse(fin="SAFETY"))
     with pytest.raises(ErreurLLM, match="bloquée"):
