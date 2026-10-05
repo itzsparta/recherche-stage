@@ -168,9 +168,15 @@ class Orchestrateur:
 
         if suivre:
             self.progres("Suivi de la boîte mail…")
-            resultat = self.suivi.executer()
-            rapport["reponses"] += resultat["reponses"]
-            rapport["relances"] += resultat["relances"]
+            try:
+                resultat = self.suivi.executer()
+                rapport["reponses"] += resultat["reponses"]
+                rapport["relances"] += resultat["relances"]
+            except (ErreurLLM, ErreurReseau) as e:
+                # Boîte injoignable : le reste du cycle est acquis, le suivi reprendra au prochain.
+                rapport["suivi_en_echec"] += 1
+                self.store.journaliser("suivi", "erreur", details={"erreur": str(e)})
+                self._escalader(None, "suivi", f"Suivi des réponses impossible : {e}. Vérifier suivi.imap dans config.yaml.")
 
         self._bilan_si_du(rapport)
 

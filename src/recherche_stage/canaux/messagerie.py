@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Protocol
 
 from ..config import ParamsIMAP, ParamsSMTP, secret
+from ..reseau import ErreurReseau
 from ..sources import texte_brut
 
 
@@ -102,8 +103,15 @@ class BoiteIMAP:
 
     def messages_depuis(self, depuis: datetime) -> list[MessageRecu]:
         p = self.params
+        try:
+            return self._lire(depuis)
+        except (OSError, imaplib.IMAP4.error) as e:  # OSError couvre délai dépassé et refus de connexion
+            raise ErreurReseau(f"boîte IMAP {p.hote}:{p.port} ({p.utilisateur}) : {type(e).__name__} {e}") from e
+
+    def _lire(self, depuis: datetime) -> list[MessageRecu]:
+        p = self.params
         recus: list[MessageRecu] = []
-        with imaplib.IMAP4_SSL(p.hote, p.port, ssl_context=ssl.create_default_context()) as boite:
+        with imaplib.IMAP4_SSL(p.hote, p.port, ssl_context=ssl.create_default_context(), timeout=30) as boite:
             boite.login(p.utilisateur, secret(p.mot_de_passe_env))
             boite.select(p.dossier, readonly=True)
             _, donnees = boite.search(None, "SINCE", depuis.strftime("%d-%b-%Y"))

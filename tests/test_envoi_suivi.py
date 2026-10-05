@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+import pytest
+
 from conftest import FausseBoite, FauxExpediteur, classification, offre, preparation, sortie_redaction
 
 from recherche_stage.agents.envoi import AgentEnvoi
@@ -212,3 +214,19 @@ def test_relance_soumise_a_validation_sans_autonomie(ctx, horloge):
     d = ctx.store.get(d.id)
     assert d.etape_attente == "relance:1"
     assert (ctx.dossier_fichiers(d.id) / "relance1.txt").exists()
+
+
+def test_boite_imap_injoignable_erreur_explicite(monkeypatch):
+    import socket
+
+    from recherche_stage.canaux.messagerie import BoiteIMAP
+    from recherche_stage.config import ParamsIMAP
+    from recherche_stage.reseau import ErreurReseau
+
+    with socket.socket() as s:  # port local libre, donc fermé
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    monkeypatch.setenv("IMAP_MOT_DE_PASSE", "x")
+    boite = BoiteIMAP(ParamsIMAP(hote="127.0.0.1", port=port, utilisateur="moi@exemple.fr"))
+    with pytest.raises(ErreurReseau, match=f"127.0.0.1:{port}"):
+        boite.messages_depuis(datetime(2026, 1, 1))

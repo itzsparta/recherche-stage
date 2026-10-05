@@ -169,3 +169,19 @@ def test_refuser_une_relance_garde_la_candidature(orchestrateur, ctx, horloge):
     orchestrateur.rejeter("d1")
     d = ctx.store.get("d1")
     assert d.statut == Statut.envoyee and len(d.suivi.relances) == 1 and d.etape_attente == ""
+
+
+def test_boite_injoignable_ne_fait_pas_tomber_le_cycle(orchestrateur, ctx):
+    from recherche_stage.reseau import ErreurReseau
+
+    class BoiteInjoignable:
+        def messages_depuis(self, depuis):
+            raise ErreurReseau("boîte IMAP imap.exemple.fr:993 : TimeoutError")
+
+    orchestrateur.suivi.boite = BoiteInjoignable()
+    rapport = orchestrateur.cycle()
+    assert rapport["suivi_en_echec"] == 1 and rapport["brouillons"] == 1  # le reste du cycle est acquis
+    [escalade] = [e for e in ctx.store.escalades_ouvertes() if e["type"] == "suivi"]
+    assert "imap.exemple.fr" in escalade["question"]
+    orchestrateur.cycle(collecter=False)
+    assert len([e for e in ctx.store.escalades_ouvertes() if e["type"] == "suivi"]) == 1  # pas de doublon
