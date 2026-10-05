@@ -79,6 +79,17 @@ def test_capacite_hebdomadaire_limite_les_dossiers_lances(ctx):
     assert len(ctx.store.lister([Statut.scoree])) == 1  # le second attend la semaine suivante
 
 
+def test_dossiers_par_cycle_etalent_la_consommation(ctx):
+    ctx.config.orchestrateur.dossiers_max_par_cycle = 1
+    ctx.llm.reponses.update({"scoring": evaluation_offre(), "enquete": fiche_extraite(), "redaction": sortie_redaction(),
+                             "critique": evaluation_critique()})
+    sources = [FauxSource("jobteaser", [offre(), offre(entreprise="Autre Énergie", contact_email="rh@autre.fr")])]
+    o = Orchestrateur(ctx, sources, rng=random.Random(0), dormir=lambda s: None)
+    assert o.cycle()["enquetes"] == 1
+    assert o.cycle(collecter=False)["enquetes"] == 1  # le second au cycle suivant
+    assert not ctx.store.lister([Statut.scoree, Statut.enquetee])
+
+
 def test_budget_llm_epuise(ctx):
     def epuise(contenu, schema):
         raise BudgetEpuise("budget atteint")

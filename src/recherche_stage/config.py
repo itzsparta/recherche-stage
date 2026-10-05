@@ -15,6 +15,9 @@ class ParamsOrchestrateur(BaseModel):
     candidatures_max_par_semaine: int = 15
     seuil_score_minimum: float = 60
     iterations_critique_max: int = 2
+    # Enquêtes, et rédactions, lancées par cycle au plus : étale la consommation
+    # (limites d'usage d'un abonnement Claude, quota Gemini) sur plusieurs cycles.
+    dossiers_max_par_cycle: int = 5
     appels_api_max_par_semaine: int = 600
     seuil_confiance: float = 0.5
 
@@ -37,10 +40,15 @@ class ParamsLLM(BaseModel):
     effort: str = "medium"
     effort_critique: str = "high"
     recherche_web: bool = True
-    # Claude Code (`fournisseur: claude_code`) : alias de modèle de la commande `claude`
+    # Claude Code (`fournisseur: claude_code`) : modèle (identifiant ou alias) de la commande `claude`
     claude_code_commande: str = "claude"
     claude_code_modele: str = "claude-sonnet-5-5"
     claude_code_modele_critique: str = "claude-sonnet-5-5"
+    # Modèle propre à un agent, ex. {scoring: claude-haiku-4-5} : plus économe
+    claude_code_modele_par_agent: dict[str, str] = Field(default_factory=dict)
+    # Effort (réflexion) : chaque palier coûte nettement plus sur l'abonnement
+    claude_code_effort: str = "low"
+    claude_code_effort_critique: str = "medium"
     claude_code_delai_secondes: float = 300
     # Gemini (clé dans la variable d'environnement nommée ci-dessous)
     gemini_modele: str = "gemini-3.8-flash"

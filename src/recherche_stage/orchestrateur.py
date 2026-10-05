@@ -126,6 +126,7 @@ class Orchestrateur:
     def _cycle(self, rapport: Counter, collecter: bool, envoyer: bool, suivre: bool) -> None:
         seuil = self.ctx.config.orchestrateur.seuil_score_minimum
         seuil_confiance = self.ctx.config.orchestrateur.seuil_confiance
+        par_cycle = self.ctx.config.orchestrateur.dossiers_max_par_cycle
         nouvelles_candidatures = not self._deadline_depassee()
 
         if collecter and nouvelles_candidatures:
@@ -146,7 +147,7 @@ class Orchestrateur:
                 if d.score.valeur >= seuil and (d.score.confiance >= seuil_confiance or "scoring" in d.valide_humain)
             ]
             candidats.sort(key=lambda d: (d.prioritaire, d.score.valeur), reverse=True)
-            retenus = candidats[: self.capacite()]
+            retenus = candidats[: min(self.capacite(), par_cycle)]
             for i, dossier in enumerate(retenus, 1):
                 self.progres(f"Enquête {i}/{len(retenus)} : {dossier.offre.entreprise}")
                 if self._executer("enquete", dossier, lambda d=dossier: self.enquete.executer(d)):
@@ -155,8 +156,13 @@ class Orchestrateur:
         if not profil.cv_pdf or not Path(profil.cv_pdf).exists():
             self._escalader(None, "cv_pdf", "CV PDF introuvable : rs profil --cv-pdf <fichier>. Rédaction suspendue.")
         else:
-            # `redigee` / `en_critique` : boucle interrompue par une erreur, reprise au Critique.
-            a_rediger = self.store.lister([Statut.enquetee, Statut.redigee, Statut.en_critique])
+            # `redigee` / `en_critique` : boucle interrompue par une erreur, reprise au Critique
+            # en premier ; puis les meilleurs scores, dans la limite du cycle.
+            a_rediger = sorted(
+                self.store.lister([Statut.enquetee, Statut.redigee, Statut.en_critique]),
+                key=lambda d: (d.statut != Statut.enquetee, d.prioritaire, d.score.valeur),
+                reverse=True,
+            )[:par_cycle]
             for i, dossier in enumerate(a_rediger, 1):
                 self.progres(f"Rédaction et critique {i}/{len(a_rediger)} : {dossier.offre.entreprise}")
                 self._rediger_et_critiquer(dossier, rapport)

@@ -86,6 +86,22 @@ système par fichier. Les URL retenues sont celles que les outils ont
 renvoyées. Il faut avoir installé Claude Code et lancé `claude` une fois pour
 se connecter. Une limite d'usage atteinte arrête le cycle comme un quota.
 
+Pour ménager les limites de l'abonnement :
+
+- `claude_code_modele` : `claude-sonnet-5-5` par défaut ;
+- `claude_code_effort` et `claude_code_effort_critique` : `low` et `medium` par
+  défaut, car chaque palier de réflexion consomme nettement plus ;
+- l'Enquête se limite à 3 recherches et 2 pages lues ; c'est l'appel le plus
+  coûteux, car les recherches et les lectures de pages passent par des appels
+  supplémentaires ;
+- `claude_code_modele_par_agent` donne un modèle plus léger à un agent, par
+  exemple `{scoring: claude-haiku-4-5}` ;
+- `orchestrateur.dossiers_max_par_cycle` (5) borne les enquêtes et les
+  rédactions de chaque cycle : les suivantes passent au cycle d'après ;
+- `orchestrateur.iterations_critique_max` à 1 évite une seconde réécriture.
+
+Chaque appel ignore les CLAUDE.md, skills, hooks et plugins de l'utilisateur.
+
 Avec Gemini (`gemini-3.8-flash` par défaut), l'Enquête s'appuie sur
 l'ancrage Google Search. La température du Critique (`temperature_critique`,
 0,1) n'est appliquée qu'aux modèles Gemini 1.x et 2.x : Google déconseille de

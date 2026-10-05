@@ -9,6 +9,7 @@ orchestrateur:
   candidatures_max_par_semaine: 15
   seuil_score_minimum: 60
   iterations_critique_max: 2
+  dossiers_max_par_cycle: 5 # enquêtes et rédactions par cycle : étale la consommation
   appels_api_max_par_semaine: 600
   seuil_confiance: 0.5
 
@@ -22,9 +23,12 @@ llm:
   modele: claude-opus-5-5
   modele_critique: claude-opus-5-5
   effort: medium
-  effort_critique: high     # effort : aussi utilisé par claude_code
+  effort_critique: high
   claude_code_modele: claude-sonnet-5-5   # identifiant exact (ou alias sonnet, opus, haiku)
   claude_code_modele_critique: claude-sonnet-5-5
+  # claude_code_modele_par_agent: {scoring: claude-haiku-4-5}   # agent moins coûteux
+  claude_code_effort: low                 # low, medium, high… : chaque palier consomme plus
+  claude_code_effort_critique: medium
   recherche_web: true       # enquête entreprise par recherche web sourcée
   gemini_modele: gemini-3.8-flash         # clé : variable GEMINI_API_KEY (aistudio.google.com)
   gemini_modele_critique: gemini-3.8-flash

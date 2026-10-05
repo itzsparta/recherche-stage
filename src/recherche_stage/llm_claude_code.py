@@ -42,6 +42,13 @@ FORMAT DE RÉPONSE : uniquement un objet JSON conforme à ce schéma, sans texte
 {schema}"""
 
 
+# Chaque recherche et chaque page lue sont facturées sur l'abonnement.
+BUDGET_RECHERCHE = """
+
+BUDGET : 3 recherches web et 2 pages lues au plus. Arrête-toi dès que tu as l'activité,
+deux ou trois faits récents sourcés et, si elle existe, une adresse de contact."""
+
+
 def _json_dans(texte: str) -> str:
     """Retire un éventuel bloc ```json … ``` autour de la réponse."""
     bloc = re.search(r"```(?:json)?\s*(.*?)```", texte, re.S)
@@ -60,6 +67,10 @@ class ClaudeCodeLLM:
         if self.store.appels_llm_semaine() >= self.budget_hebdo:
             raise BudgetEpuise(f"Budget de {self.budget_hebdo} appels LLM atteint cette semaine")
 
+    def _modele(self, agent: str, critique: bool = False) -> str:
+        defaut = self.params.claude_code_modele_critique if critique else self.params.claude_code_modele
+        return self.params.claude_code_modele_par_agent.get(agent, defaut)
+
     def _lancer(self, agent: str, modele: str, systeme: str, contenu: str, options: list[str], flux: bool = False):
         """Lance `claude -p` ; renvoie les événements (mode flux) et l'événement final."""
         self._verifier_budget()
@@ -73,6 +84,10 @@ class ClaudeCodeLLM:
                 "--model", modele,
                 "--no-session-persistence",
                 "--strict-mcp-config",
+                # Ni CLAUDE.md, ni skills, ni hooks ou plugins de l'utilisateur : autant
+                # de jetons en moins à chaque appel.
+                "--setting-sources", "project",
+                "--disable-slash-commands",
                 *options,
             ]
             if flux:
@@ -117,8 +132,8 @@ class ClaudeCodeLLM:
 
     def structurer(self, agent: str, systeme: str, contenu: str, schema: type[T], critique: bool = False) -> T:
         schema_json = json.dumps(schema.model_json_schema(), ensure_ascii=False)
-        modele = self.params.claude_code_modele_critique if critique else self.params.claude_code_modele
-        options = ["--tools", "", "--effort", self.params.effort_critique if critique else self.params.effort]
+        modele = self._modele(agent, critique)
+        options = ["--tools", "", "--effort", self.params.claude_code_effort_critique if critique else self.params.claude_code_effort]
         # Un .exe reçoit le schéma intact ; un script .cmd (installation npm sous
         # Windows) le déformerait : il reste alors dans le prompt système seul.
         if not self.commande.lower().endswith((".cmd", ".bat")):
@@ -133,7 +148,7 @@ class ClaudeCodeLLM:
 
     def rechercher(self, agent: str, systeme: str, requete: str) -> tuple[str, list[str]]:
         options = ["--tools", "WebSearch,WebFetch", "--allowedTools", "WebSearch,WebFetch", "--effort", "low"]
-        evenements, final = self._lancer(agent, self.params.claude_code_modele, systeme, requete, options, flux=True)
+        evenements, final = self._lancer(agent, self._modele(agent), systeme + BUDGET_RECHERCHE, requete, options, flux=True)
         urls: list[str] = []
         lectures: dict[str, str] = {}  # id de l'appel WebFetch -> URL demandée
         for e in evenements:
