@@ -53,7 +53,42 @@ def lire_document(chemin: str | Path) -> str:
         except ImportError as e:
             raise RuntimeError("Lecture PDF : installez l'extra `pdf` (pip install -e .[pdf]) ou fournissez un .txt") from e
         return "\n".join(page.extract_text() or "" for page in PdfReader(str(chemin)).pages)
+    if chemin.suffix.lower() == ".docx":
+        return lire_docx(chemin)
     return chemin.read_text(encoding="utf-8")
+
+
+def lire_docx(chemin: Path) -> str:
+    """Texte d'un .docx (bibliothèque standard) : un paragraphe par ligne,
+    tableaux et zones de texte compris."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    with zipfile.ZipFile(chemin) as archive:
+        racine = ET.fromstring(archive.read("word/document.xml"))
+    # Une zone de texte est stockée deux fois (version moderne et version de
+    # repli pour les anciens Word) : on ne garde que la première.
+    repli = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+    for parent in list(racine.iter()):
+        for enfant in [e for e in parent if e.tag == repli]:
+            parent.remove(enfant)
+
+    def morceaux(noeud):
+        for enfant in noeud:
+            if enfant.tag == f"{w}p":
+                continue  # paragraphe imbriqué (zone de texte) : lu pour lui-même
+            if enfant.tag == f"{w}t" and enfant.text:
+                yield enfant.text
+            elif enfant.tag == f"{w}tab":
+                yield " | "
+            elif enfant.tag in (f"{w}br", f"{w}cr"):
+                yield "\n"
+            else:
+                yield from morceaux(enfant)
+
+    lignes = [texte for p in racine.iter(f"{w}p") if (texte := "".join(morceaux(p)).strip())]
+    return "\n".join(lignes)
 
 
 def _date(valeur) -> date | None:

@@ -97,3 +97,24 @@ def test_profil_complet_enregistre(ctx, tmp_path):
     ctx.llm.reponses["profil"] = profil().model_dump(exclude={"cv_pdf"}) | {"manquants": []}
     p, g = AgentProfil(ctx).executer(cv, {"disponibilite": {"du": "2027-04-06", "au": "2027-06-25"}, "lieux": ["59"], "requetes": ["maintenance"]}, cv_pdf="cv.pdf")
     assert p.cv_pdf == "cv.pdf" and g.souples and ctx.store.parametre("grille") is not None
+
+
+def test_lecture_docx_zones_de_texte_sans_doublon(tmp_path):
+    import zipfile
+
+    from recherche_stage.agents.profil import lire_document
+
+    w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    mc = 'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"'
+    document = f"""<w:document {w} {mc}><w:body>
+      <w:p><w:r><w:t>Rémi</w:t></w:r><w:r><w:tab/><w:t>Lille</w:t></w:r></w:p>
+      <w:p><w:r><mc:AlternateContent>
+        <mc:Choice><w:txbxContent><w:p><w:r><w:t>Compétences : GMAO</w:t></w:r></w:p></w:txbxContent></mc:Choice>
+        <mc:Fallback><w:txbxContent><w:p><w:r><w:t>Compétences : GMAO</w:t></w:r></w:p></w:txbxContent></mc:Fallback>
+      </mc:AlternateContent></w:r><w:r><w:t>Expériences</w:t></w:r></w:p>
+      <w:tbl><w:tr><w:tc><w:p><w:r><w:t>2025</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Stage maintenance</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+    </w:body></w:document>"""
+    chemin = tmp_path / "cv.docx"
+    with zipfile.ZipFile(chemin, "w") as archive:
+        archive.writestr("word/document.xml", document)
+    assert lire_document(chemin).split("\n") == ["Rémi | Lille", "Expériences", "Compétences : GMAO", "2025", "Stage maintenance"]

@@ -1,7 +1,7 @@
 """Interface en ligne de commande : `rs <commande>`.
 
     rs init                          crée config.yaml, preferences.yaml et le dossier imports/
-    rs profil --cv cv.pdf            agent Profil (CV, relevés, préférences)
+    rs profil --cv cv.pdf            agent Profil (CV en PDF, DOCX ou texte ; relevés ; préférences)
     rs cycle                         un passage complet du pipeline
     rs file                          ce qui attend une décision humaine
     rs voir <id>                     détail d'un dossier et de ses documents
