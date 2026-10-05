@@ -79,6 +79,7 @@ class Orchestrateur:
             raise
         except (ErreurLLM, ErreurReseau, OSError, ValueError, RuntimeError) as e:
             echecs = sum(1 for h in dossier.historique if h.action.startswith("erreur")) + 1
+            self.progres(f"  erreur ({echecs}/{ERREURS_AVANT_FILE}) : {e}")
             dossier.tracer(agent_nom, f"erreur:{e.__class__.__name__}")
             self.store.journaliser(agent_nom, "erreur", dossier.id, details={"erreur": str(e), "echecs": echecs})
             if echecs >= ERREURS_AVANT_FILE:

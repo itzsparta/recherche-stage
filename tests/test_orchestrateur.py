@@ -95,9 +95,12 @@ def test_erreurs_repetees_file_des_irrecuperables(ctx, horloge):
 
     ctx.llm.reponses["scoring"] = panne
     orchestrateur = Orchestrateur(ctx, [FauxSource("x", [offre()])], dormir=lambda s: None)
+    affiche = []
+    orchestrateur.progres = affiche.append
     for _ in range(3):
         orchestrateur.cycle()
         horloge.instant += timedelta(hours=1)
+    assert "  erreur (1/3) : surcharge" in affiche  # visible dès le premier échec
     [d] = ctx.store.lister()
     assert d.statut == Statut.erreur
     assert any(e["type"] == "erreur" for e in ctx.store.escalades_ouvertes())
