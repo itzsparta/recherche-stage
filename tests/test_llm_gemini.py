@@ -44,9 +44,17 @@ def test_sortie_structuree_et_temperature_du_critique(serveur, horloge):
     config = corps["generationConfig"]
     assert config["responseMimeType"] == "application/json"
     assert config["responseJsonSchema"]["properties"]["categorie"]["enum"] == ["refus", "entretien", "demande_info", "autre"]
-    assert config["temperature"] == 0.1
+    assert "temperature" not in config  # Gemini 3+ : température par défaut, recommandée par Google
     assert corps["systemInstruction"]["parts"][0]["text"] == "système"
     assert llm.store.appels_llm_semaine() == 1
+
+
+def test_temperature_du_critique_sur_gemini_2(serveur, horloge):
+    serveur.reponses.append(reponse('{"concerne_candidature": false, "categorie": "autre", "confiance": 0.5, "date_entretien": "", "resume": ""}'))
+    client = genai.Client(api_key="test", http_options={"base_url": serveur.url, "retry_options": {"attempts": 1}})
+    params = ParamsLLM(fournisseur="gemini", gemini_modele_critique="gemini-2.5-pro")
+    GeminiLLM(params, Store(":memory:", horloge=horloge), 10, client=client).structurer("critique", "s", "c", Classification, critique=True)
+    assert serveur.requetes[0][1]["generationConfig"]["temperature"] == 0.1
 
 
 def test_reponse_bloquee(serveur, horloge):

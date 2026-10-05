@@ -9,6 +9,8 @@ métadonnées d'ancrage, pas du texte généré.
 
 from __future__ import annotations
 
+import re
+
 from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -68,9 +70,11 @@ class GeminiLLM:
             "response_json_schema": schema.model_json_schema(),
             "max_output_tokens": 16000,
         }
-        if critique:
-            config["temperature"] = self.params.temperature_critique
         modele = self.params.gemini_modele_critique if critique else self.params.gemini_modele
+        # Google déconseille d'abaisser la température des modèles Gemini 3 et
+        # suivants (boucles, raisonnement dégradé) : réservée aux modèles 1.x et 2.x.
+        if critique and re.match(r"gemini-[12][.-]", modele):
+            config["temperature"] = self.params.temperature_critique
         reponse = self._generer(agent, modele, contenu, config)
         try:
             return schema.model_validate_json(reponse.text or "")

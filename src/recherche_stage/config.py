@@ -37,10 +37,10 @@ class ParamsLLM(BaseModel):
     effort_critique: str = "high"
     recherche_web: bool = True
     # Gemini (clé dans la variable d'environnement nommée ci-dessous)
-    gemini_modele: str = "gemini-2.5-pro"
-    gemini_modele_critique: str = "gemini-2.5-pro"
+    gemini_modele: str = "gemini-3.8-flash"
+    gemini_modele_critique: str = "gemini-3.8-flash"
     gemini_cle_env: str = "GEMINI_API_KEY"
-    temperature_critique: float = 0.1  # appliquée par Gemini ; les modèles Claude actuels n'en acceptent pas
+    temperature_critique: float = 0.1  # appliquée par Gemini 1.x et 2.x seulement ; Claude et Gemini 3+ la déconseillent
 
 
 class ParamsVeille(BaseModel):

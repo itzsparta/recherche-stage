@@ -78,8 +78,10 @@ Dans `config.yaml`, section `llm` :
 | `fournisseur: gemini` | tous les agents sur Gemini (`gemini_modele`) |
 | `fournisseur: claude` + `fournisseur_critique: gemini` | rédaction par Claude, relecture par Gemini (ou l'inverse) : le Critique ne partage ni le modèle ni les biais du rédacteur |
 
-Avec Gemini, l'Enquête s'appuie sur l'ancrage Google Search et la
-température du Critique (`temperature_critique`, 0,1) est appliquée.
+Avec Gemini (`gemini-3.8-flash` par défaut), l'Enquête s'appuie sur
+l'ancrage Google Search. La température du Critique (`temperature_critique`,
+0,1) n'est appliquée qu'aux modèles Gemini 1.x et 2.x : Google déconseille de
+l'abaisser à partir de Gemini 3.
 
 ## Démarrage
 
@@ -194,10 +196,11 @@ des propositions :
 
 ## Écarts assumés par rapport à la spécification
 
-- **Température 0,1 du Critique** : appliquée quand le Critique tourne sur
-  Gemini. Les modèles Claude actuels n'acceptent plus de paramètre
-  d'échantillonnage : la stabilité vient alors des questions fermées et du
-  calcul déterministe de la note.
+- **Température 0,1 du Critique** : appliquée seulement quand le Critique
+  tourne sur Gemini 1.x ou 2.x. Les modèles Claude actuels n'acceptent plus
+  de paramètre d'échantillonnage et Google déconseille de l'abaisser à partir
+  de Gemini 3 : la stabilité vient alors des questions fermées et du calcul
+  déterministe de la note.
 - **CV adapté** : produit en HTML imprimable (`cv_vN.html`). Le PDF d'origine
   est joint, sauf si un export `cv_vN.pdf` existe dans le dossier. La lettre,
   elle, est convertie en PDF automatiquement.
