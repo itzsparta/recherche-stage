@@ -42,7 +42,8 @@ def llm(horloge, commande, **params):
     return instance
 
 
-def test_sortie_structuree_sans_outil_ni_texte_libre_en_argument(horloge):
+def test_sortie_structuree_sans_outil_ni_texte_libre_en_argument(horloge, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-oat-pas-une-cle")
     commande = FausseCommande(resultat(structured_output=CLASSE))
     instance = llm(horloge, commande)
     assert instance.structurer("suivi", "Classe ce mail.", "Bonjour, entretien mardi", Classification).categorie == "entretien"
@@ -53,6 +54,7 @@ def test_sortie_structuree_sans_outil_ni_texte_libre_en_argument(horloge):
     assert appel["input"] == "Bonjour, entretien mardi"  # contenu par l'entrée standard
     assert appel["systeme"].startswith("Classe ce mail.") and '"categorie"' in appel["systeme"]
     assert "--json-schema" in args
+    assert "ANTHROPIC_API_KEY" not in appel["env"]  # le compte connecté (abonnement) fait foi
     assert instance.store.appels_llm_semaine() == 1
 
 

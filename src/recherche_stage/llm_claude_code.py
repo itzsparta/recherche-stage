@@ -16,6 +16,7 @@ texte généré.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -30,6 +31,10 @@ from .llm import BudgetEpuise, ErreurLLM, QuotaEpuise
 from .store import Store
 
 T = TypeVar("T", bound=BaseModel)
+
+# Une clé d'API ou un jeton dans l'environnement passerait avant le compte
+# connecté (abonnement) : on ne les transmet pas à `claude`.
+VARIABLES_ECARTEES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 
 CONSIGNE_JSON = """
 
@@ -76,6 +81,7 @@ class ClaudeCodeLLM:
                 fini = self.executer(
                     commande, input=contenu, capture_output=True, text=True, encoding="utf-8",
                     errors="replace", timeout=self.params.claude_code_delai_secondes, cwd=dossier,
+                    env={k: v for k, v in os.environ.items() if k not in VARIABLES_ECARTEES},
                 )
             except FileNotFoundError as e:
                 raise ErreurLLM(
