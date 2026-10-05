@@ -25,7 +25,8 @@ class ParamsAutonomie(BaseModel):
 
 
 class ParamsLLM(BaseModel):
-    # Fournisseur des agents, et du Critique à part : « claude » ou « gemini ».
+    # Fournisseur des agents, et du Critique à part : « claude » (clé d'API),
+    # « claude_code » (commande `claude`, compte Pro/Max, sans clé) ou « gemini ».
     # Un Critique sur un autre fournisseur que le rédacteur est vraiment indépendant.
     fournisseur: str = "claude"
     fournisseur_critique: str | None = None  # par défaut : le même que `fournisseur`
@@ -36,6 +37,11 @@ class ParamsLLM(BaseModel):
     effort: str = "medium"
     effort_critique: str = "high"
     recherche_web: bool = True
+    # Claude Code (`fournisseur: claude_code`) : alias de modèle de la commande `claude`
+    claude_code_commande: str = "claude"
+    claude_code_modele: str = "sonnet"
+    claude_code_modele_critique: str = "sonnet"
+    claude_code_delai_secondes: float = 300
     # Gemini (clé dans la variable d'environnement nommée ci-dessous)
     gemini_modele: str = "gemini-3.8-flash"
     gemini_modele_critique: str = "gemini-3.8-flash"

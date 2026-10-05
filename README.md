@@ -76,7 +76,15 @@ Dans `config.yaml`, section `llm` :
 |---|---|
 | `fournisseur: claude` | tous les agents sur Claude (défaut) |
 | `fournisseur: gemini` | tous les agents sur Gemini (`gemini_modele`) |
+| `fournisseur: claude_code` | tous les agents sur Claude via la commande `claude` de Claude Code, avec le compte Pro ou Max connecté : aucune clé d'API, les limites d'usage de l'abonnement s'appliquent |
 | `fournisseur: claude` + `fournisseur_critique: gemini` | rédaction par Claude, relecture par Gemini (ou l'inverse) : le Critique ne partage ni le modèle ni les biais du rédacteur |
+
+Avec `claude_code`, chaque appel lance `claude -p` dans un dossier temporaire
+vide : sans outil pour les sorties structurées, avec WebSearch et WebFetch
+seulement pour l'Enquête. Le contenu passe par l'entrée standard et le prompt
+système par fichier. Les URL retenues sont celles que les outils ont
+renvoyées. Il faut avoir installé Claude Code et lancé `claude` une fois pour
+se connecter. Une limite d'usage atteinte arrête le cycle comme un quota.
 
 Avec Gemini (`gemini-3.8-flash` par défaut), l'Enquête s'appuie sur
 l'ancrage Google Search. La température du Critique (`temperature_critique`,

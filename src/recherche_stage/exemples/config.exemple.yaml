@@ -17,12 +17,14 @@ autonomie:                  # levée de la validation humaine avant envoi
   taux_requis: 0.95
 
 llm:
-  fournisseur: claude       # claude ou gemini
+  fournisseur: claude       # claude (clé d'API), claude_code (abonnement Claude, sans clé) ou gemini
   # fournisseur_critique: gemini   # Critique sur l'autre fournisseur : relecture vraiment indépendante
   modele: claude-opus-5-5
   modele_critique: claude-opus-5-5
   effort: medium
-  effort_critique: high
+  effort_critique: high     # effort : aussi utilisé par claude_code
+  claude_code_modele: sonnet          # alias de la commande `claude` (sonnet, opus, haiku)
+  claude_code_modele_critique: sonnet
   recherche_web: true       # enquête entreprise par recherche web sourcée
   gemini_modele: gemini-3.8-flash         # clé : variable GEMINI_API_KEY (aistudio.google.com)
   gemini_modele_critique: gemini-3.8-flash

@@ -167,12 +167,13 @@ class RouteurLLM:
 
 def construire_llm(params: ParamsLLM, store: Store, budget_hebdo: int) -> LLM:
     from .llm import ClaudeLLM
+    from .llm_claude_code import ClaudeCodeLLM
 
-    fabriques = {"claude": ClaudeLLM, "gemini": GeminiLLM}
+    fabriques = {"claude": ClaudeLLM, "claude_code": ClaudeCodeLLM, "gemini": GeminiLLM}
     noms = {params.fournisseur, params.fournisseur_critique or params.fournisseur}
     inconnus = noms - fabriques.keys()
     if inconnus:
-        raise ValueError(f"Fournisseur LLM inconnu : {', '.join(sorted(inconnus))} (claude ou gemini)")
+        raise ValueError(f"Fournisseur LLM inconnu : {', '.join(sorted(inconnus))} (claude, claude_code ou gemini)")
     instances = {nom: fabriques[nom](params, store, budget_hebdo) for nom in noms}
     principal = instances[params.fournisseur]
     critique = instances[params.fournisseur_critique or params.fournisseur]
