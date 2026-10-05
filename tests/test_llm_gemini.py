@@ -156,3 +156,14 @@ def test_modele_sature_evite_aux_appels_suivants(serveur, horloge):
     chemins = [entetes["_chemin"] for entetes, _ in serveur.requetes]
     assert len(chemins) == 3
     assert "gemini-3.8-flash" in chemins[0] and "gemini-3.7-flash" in chemins[1] and "gemini-3.7-flash" in chemins[2]
+
+
+def test_delai_depasse_bascule_puis_erreur_explicite(serveur, horloge):
+    lente = reponse(CLASSE) | {"_delai": 1.5}
+    serveur.reponses += [dict(lente), reponse(CLASSE), dict(lente)]
+    client = genai.Client(api_key="test", http_options={"base_url": serveur.url, "retry_options": {"attempts": 1}, "timeout": 500})
+    params = ParamsLLM(fournisseur="gemini", gemini_modele_secours=["gemini-3.7-flash"])
+    llm = GeminiLLM(params, Store(":memory:", horloge=horloge), 10, client=client)
+    assert llm.structurer("suivi", "s", "c", Classification).categorie == "autre"  # 3.8 trop lent → 3.7
+    with pytest.raises(ErreurLLM, match="trop lent"):
+        llm.structurer("suivi", "s", "c", Classification)  # 3.7 trop lent à son tour, plus de secours

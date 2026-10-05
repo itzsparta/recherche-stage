@@ -52,6 +52,7 @@ class ParamsLLM(BaseModel):
     # de Google est « high », lent ; « low » suffit à extraire et rédiger.
     gemini_reflexion: str = "low"
     gemini_reflexion_critique: str = "medium"
+    gemini_delai_secondes: float = 180  # au-delà, l'appel est abandonné (le SDK attendrait sans fin)
     gemini_cle_env: str = "GEMINI_API_KEY"
     temperature_critique: float = 0.1  # appliquée par Gemini 1.x et 2.x seulement ; Claude et Gemini 3+ la déconseillent
 

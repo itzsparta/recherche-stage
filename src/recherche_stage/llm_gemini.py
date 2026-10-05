@@ -40,7 +40,10 @@ class GeminiLLM:
             # Gemini répond souvent 503 (surcharge) ou 429 : le SDK ne réessaie pas par défaut.
             client = genai.Client(
                 api_key=secret(params.gemini_cle_env),
-                http_options={"retry_options": {"attempts": 3, "initial_delay": 2, "max_delay": 30}},
+                http_options={
+                    "retry_options": {"attempts": 3, "initial_delay": 2, "max_delay": 30},
+                    "timeout": int(params.gemini_delai_secondes * 1000),  # en millisecondes
+                },
             )
         self.client = client
         self.satures: set[str] = set()  # modèles saturés pendant cette exécution
@@ -50,6 +53,7 @@ class GeminiLLM:
             raise BudgetEpuise(f"Budget de {self.budget_hebdo} appels LLM atteint cette semaine")
 
     def _generer(self, agent: str, modele: str, contenu: str, config: dict):
+        import httpx
         from google.genai import errors
 
         self._verifier_budget()
@@ -67,6 +71,13 @@ class GeminiLLM:
                 options["thinking_config"] = {"thinking_level": niveau}
         try:
             reponse = self.client.models.generate_content(model=modele, contents=contenu, config=options)
+        except httpx.TransportError as e:
+            # Délai dépassé ou connexion coupée : le SDK ne réessaie pas ces erreurs.
+            if secours:
+                self.satures.add(modele)
+                self.store.journaliser(agent, "llm_secours", details={"modele": modele, "secours": secours, "code": type(e).__name__})
+                return self._generer(agent, secours, contenu, config)
+            raise ErreurLLM(f"{agent} : Gemini injoignable ou trop lent ({type(e).__name__}) [{modele}]") from e
         except errors.APIError as e:
             if e.code in (400, 401, 403) and "key" in str(e.message or "").lower():
                 raise ErreurLLM(f"{agent} : clé Gemini refusée ({e.code}). Vérifier {self.params.gemini_cle_env}") from e

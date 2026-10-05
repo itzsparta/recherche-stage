@@ -3,7 +3,8 @@ vérifie la requête réellement sérialisée, sans réseau ni clé API."""
 
 import json
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import anthropic
 import pytest
@@ -26,6 +27,7 @@ class Serveur:
                 serveur.requetes.append((dict(self.headers) | {"_chemin": self.path}, corps))
                 donnee = serveur.reponses.pop(0)
                 code = donnee.pop("_statut", 200)
+                time.sleep(donnee.pop("_delai", 0))  # réponse lente : délai dépassé côté client
                 reponse = json.dumps(donnee).encode()
                 self.send_response(code)
                 self.send_header("Content-Type", "application/json")
@@ -36,7 +38,8 @@ class Serveur:
             def log_message(self, *args):
                 pass
 
-        self.http = HTTPServer(("127.0.0.1", 0), Gestionnaire)
+        self.http = ThreadingHTTPServer(("127.0.0.1", 0), Gestionnaire)
+        self.http.handle_error = lambda *args: None  # client parti avant la réponse lente
         threading.Thread(target=self.http.serve_forever, daemon=True).start()
 
     @property
