@@ -116,7 +116,7 @@ dans la section `sources` de `config.yaml`.
 | Flux RSS/Atom | Flux publiés par un site carrière ou un site d'offres | Ajouter l'adresse sous `flux:` |
 | Adzuna (agrégateur) | API officielle, gratuite | Clés sur developer.adzuna.com, puis `adzuna: true` |
 | France Travail | API officielle « Offres d'emploi v2 » | Compte francetravail.io, puis `france_travail: true` |
-| Annuaire (candidatures spontanées) | API publique recherche-entreprises.api.gouv.fr, filtrée par codes NAF et départements | `annuaire: true` |
+| Annuaire (candidatures spontanées) | API publique recherche-entreprises.api.gouv.fr, filtrée par codes NAF, départements et effectif ; l'établissement retenu est celui du département (agence locale d'un groupe) | `annuaire: true`, puis `annuaire_codes_naf`, `annuaire_departements`. Chaque cycle reprend la liste là où le précédent s'est arrêté |
 | Export manuel | CSV ou JSON déposé dans `imports/`, nommé `<source>_….csv` | Exemple : `src/recherche_stage/exemples/offres.exemple.csv` |
 | LinkedIn | Exclu | |
 

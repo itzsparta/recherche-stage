@@ -188,3 +188,54 @@ def test_le_suivi_ignore_les_alertes_deja_lues(ctx):
     ctx.llm = FauxLLM()
     AgentSuivi(ctx, FausseBoite([message()])).traiter_reponses()
     assert ctx.llm.appels == []
+
+
+# ------------------------------------------------------- annuaire (spontané)
+
+
+def _entreprise(siren, commune="Paris", cp="75008", agence=None):
+    r = {"siren": siren, "nom_complet": f"SOCIETE {siren}", "activite_principale": "71.12B",
+         "siege": {"libelle_commune": commune, "code_postal": cp}}
+    if agence:
+        r["matching_etablissements"] = [{"libelle_commune": agence[0], "code_postal": agence[1]}]
+    return r
+
+
+def test_annuaire_agence_locale_et_filtre_effectif():
+    from recherche_stage.sources.annuaire import SourceAnnuaire
+
+    http = FauxHttp({"recherche-entreprises": {"results": [_entreprise("1", agence=("Lille", "59000"))], "total_pages": 1}})
+    offres = SourceAnnuaire(http, ["71.12B"], ["59"], effectif_min=10).collecter(grille(), 5)
+    assert offres[0].lieu == "Lille (59000)"
+    assert offres[0].intitule.startswith("Stage ") and not offres[0].intitule.lower().startswith("stage stage")
+    assert "03" not in http.requetes[0][1]["tranche_effectif_salarie"].split(",")
+    assert "11" in http.requetes[0][1]["tranche_effectif_salarie"].split(",")
+
+
+def test_annuaire_reprend_ou_il_s_est_arrete(ctx):
+    from recherche_stage.sources.annuaire import SourceAnnuaire
+
+    class Pages(FauxHttp):
+        def get_json(self, url, params=None, entetes=None):
+            self.requetes.append((url, params))
+            p = params["page"]
+            return {"results": [_entreprise(f"{p}-{i}") for i in range(4)] if p <= 2 else [], "total_pages": 2}
+
+    http = Pages()
+    source = SourceAnnuaire(http, ["71.12B"], ["59"], store=ctx.store, max_par_cycle=3)
+    lots = [source.collecter(grille(), 50) for _ in range(4)]
+    assert [len(lot) for lot in lots] == [3, 1, 3, 1]  # au plus 3 par cycle, reste de page repris
+    noms = [o.entreprise for lot in lots for o in lot]
+    assert len(set(noms)) == 8
+    assert source.collecter(grille(), 50) == []  # tout vu, couple épuisé
+
+
+def test_spontanee_annuaire_passe_le_seuil(ctx):
+    from recherche_stage.agents.scoring import score_regles
+    from recherche_stage.modeles import CritereSouple, Dossier, Offre
+
+    g = grille()
+    g.souples = [CritereSouple(nom="secteur", type="secteur", valeurs=["éolien", "énergie"], poids=3)]
+    offre = Offre(intitule="Stage ingénieur (candidature spontanée)", entreprise="X", lieu="Lille (59000)",
+                  source="annuaire", type="spontanee", secteur="71.12B")
+    assert score_regles(Dossier(id="x", offre=offre), g) == 1.0

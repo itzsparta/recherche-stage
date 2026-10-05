@@ -65,7 +65,9 @@ def construire(chemin_config: str) -> tuple[Contexte, Orchestrateur]:
     if s.france_travail:
         sources.append(SourceFranceTravail(http, configuration.secret(s.france_travail_client_id_env), configuration.secret(s.france_travail_secret_env)))
     if s.annuaire:
-        sources.append(SourceAnnuaire(http, s.annuaire_codes_naf, s.annuaire_departements))
+        sources.append(SourceAnnuaire(
+            http, s.annuaire_codes_naf, s.annuaire_departements, store, s.annuaire_effectif_min, s.annuaire_max
+        ))
     if s.adzuna:
         sources.append(SourceAdzuna(http, configuration.secret(s.adzuna_app_id_env), configuration.secret(s.adzuna_app_key_env), s.adzuna_pays))
     sources += [SourceFlux(http, flux) for flux in s.flux]

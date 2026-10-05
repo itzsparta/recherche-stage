@@ -139,7 +139,8 @@ class ParamsSources(BaseModel):
     annuaire: bool = False
     annuaire_codes_naf: list[str] = Field(default_factory=list)
     annuaire_departements: list[str] = Field(default_factory=list)
-    annuaire_max: int = 20
+    annuaire_max: int = 20           # cibles nouvelles par cycle
+    annuaire_effectif_min: int = 10  # salariés ; 0 : aucune limite
     # Agrégateur Adzuna (API gratuite, clés sur developer.adzuna.com)
     adzuna: bool = False
     adzuna_pays: str = "fr"

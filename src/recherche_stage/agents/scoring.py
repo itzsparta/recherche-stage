@@ -128,6 +128,8 @@ def score_critere(critere: CritereSouple, dossier: Dossier) -> float:
     o = dossier.offre
     texte = normaliser(f"{o.intitule} {o.description} {o.secteur or ''}")
     valeurs = [normaliser(v) for v in critere.valeurs if normaliser(v)]
+    if critere.type == "secteur" and o.type == "spontanee" and o.source == "annuaire":
+        return 1.0  # cible choisie par ses codes NAF, c'est-à-dire par secteur
     if critere.type in ("mots_cles", "secteur"):
         if not valeurs:
             return 0.0

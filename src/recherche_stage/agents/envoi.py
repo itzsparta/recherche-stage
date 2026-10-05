@@ -94,10 +94,14 @@ class AgentEnvoi(Agent):
             dossier.statut = Statut.en_attente_humain
             dossier.etape_attente = "depot"
             dossier.motif = "depot_manuel"
+            ou = f"({canal}) : {destinataire}"
+            if dossier.offre.type == "spontanee":
+                ou = (f"chez {dossier.offre.entreprise} : aucune adresse publique trouvée, passer par le "
+                      f"formulaire de contact ou l'adresse RH de son site (fiche : {destinataire})")
             self.escalader(
                 dossier,
                 "depot_manuel",
-                f"Déposer la candidature « {dossier.offre.intitule} » ({canal}) : {destinataire}. "
+                f"Déposer la candidature « {dossier.offre.intitule} » {ou}. "
                 f"Pièces et réponses : {fichiers / 'a_deposer.md'}. Puis : rs marquer-envoye {dossier.id} \"<preuve>\"",
             )
         elif raisons:

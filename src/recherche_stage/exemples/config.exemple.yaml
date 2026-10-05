@@ -70,6 +70,8 @@ sources:
   annuaire: false           # candidatures spontanées via recherche-entreprises.api.gouv.fr
   annuaire_codes_naf: []    # ex. ["33.12Z", "35.11Z"]
   annuaire_departements: [] # ex. ["59", "62"]
+  annuaire_effectif_min: 10 # écarte les très petites structures (0 : aucune limite)
+  annuaire_max: 20          # nouvelles entreprises par cycle ; chaque cycle reprend où le précédent s'est arrêté
 
 envoi:
   smtp:                     # laisser hote vide : aucun envoi, brouillons seulement
