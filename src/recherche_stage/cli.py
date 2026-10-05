@@ -11,6 +11,7 @@
     rs marquer-envoye <id> <preuve>  dépôt manuel effectué
     rs liberer-envoi <id> [--nature relance1]
     rs statut                        tableau de bord
+    rs revue                         passe la file en revue : valider, corriger, rejeter, déposer
     rs fermer <n°> [note]            retire un élément de rs file (alerte traitée)
     rs reprendre-enquetes            relance l'Enquête des dossiers non rédigés à fiche minimale
     rs journal [<id>]                journal centralisé
@@ -39,6 +40,7 @@ from .canaux.messagerie import BoiteIMAP, ExpediteurSMTP
 from .llm_gemini import construire_llm
 from .orchestrateur import Orchestrateur
 from .reseau import HttpStandard
+from .revue import Revue, decrire
 from .sources.adzuna import SourceAdzuna
 from .sources.alertes_mail import SourceAlertesMail
 from .sources.annuaire import SourceAnnuaire
@@ -115,7 +117,7 @@ def cmd_cycle(args) -> None:
     print("Cycle terminé : " + (", ".join(f"{k} {v}" for k, v in sorted(rapport.items())) or "rien à faire"))
     ouvertes = orchestrateur.store.escalades_ouvertes()
     if ouvertes:
-        print(f"{len(ouvertes)} élément(s) attendent une décision : rs file")
+        print(f"{len(ouvertes)} élément(s) attendent une décision : rs revue")
 
 
 def cmd_file(args) -> None:
@@ -132,21 +134,12 @@ def cmd_voir(args) -> None:
     dossier = ctx.store.get(args.id)
     if dossier is None:
         sys.exit(f"Dossier inconnu : {args.id}")
-    o, d = dossier.offre, dossier.documents
-    print(f"{o.intitule} — {o.entreprise} ({o.lieu}) [{dossier.statut.value}{' / ' + dossier.etape_attente if dossier.etape_attente else ''}]")
-    print(f"Source : {o.source}  URL : {o.url}")
-    print(f"Score {dossier.score.valeur} (confiance {dossier.score.confiance}) : {dossier.score.justification}")
-    if dossier.critique.iteration:
-        print(f"Critique : {dossier.critique.decision} — note {dossier.critique.note} (itération {dossier.critique.iteration})")
-        for p in dossier.critique.problemes:
-            print(f"  - [{p.gravite}/{p.type}] {p.raison} « {p.extrait[:80]} »")
-    if d.version:
-        print(f"\nObjet : {d.objet_mail}\n\n{d.mail}\n")
-        if d.texte_lettre:
-            print(f"--- Lettre ({d.lettre}) ---\n{d.texte_lettre}\n")
-        print(f"Fichiers : {ctx.dossier_fichiers(dossier.id)}")
-    if dossier.motif:
-        print(f"Motif : {dossier.motif}")
+    print(decrire(ctx, dossier))
+
+
+def cmd_revue(args) -> None:
+    ctx, orchestrateur = construire(args.config)
+    Revue(ctx, orchestrateur).executer()
 
 
 def cmd_valider(args) -> None:
@@ -300,6 +293,7 @@ def main(argv: list[str] | None = None) -> None:
     p.set_defaults(func=cmd_cycle)
 
     sous.add_parser("file").set_defaults(func=cmd_file)
+    sous.add_parser("revue").set_defaults(func=cmd_revue)
     sous.add_parser("statut").set_defaults(func=cmd_statut)
     sous.add_parser("reprendre-enquetes").set_defaults(func=cmd_reprendre_enquetes)
 
