@@ -188,3 +188,29 @@ def test_boite_injoignable_ne_fait_pas_tomber_le_cycle(orchestrateur, ctx):
     assert "imap.exemple.fr" in escalade["question"]
     orchestrateur.cycle(collecter=False)
     assert len([e for e in ctx.store.escalades_ouvertes() if e["type"] == "suivi"]) == 1  # pas de doublon
+
+
+def test_quota_epuise_arrete_le_cycle_sans_penaliser_les_dossiers(orchestrateur, ctx):
+    from recherche_stage.llm import QuotaEpuise
+
+    def quota(contenu, schema):
+        raise QuotaEpuise("Quota Gemini atteint pour la journée sur gemini-2.5-flash")
+
+    ctx.llm.reponses["redaction"] = quota
+    affiche = []
+    orchestrateur.progres = affiche.append
+    rapport = orchestrateur.cycle()
+    assert rapport["quota_epuise"] == 1 and "Suivi de la boîte mail…" not in affiche
+    [d] = ctx.store.lister()
+    assert d.statut == Statut.enquetee and not any(h.action.startswith("erreur") for h in d.historique)
+    assert [e["type"] for e in ctx.store.escalades_ouvertes()] == ["quota"]
+
+
+def test_reprendre_enquetes_des_fiches_minimales(orchestrateur, ctx):
+    ctx.llm.reponses["redaction"] = lambda contenu, schema: (_ for _ in ()).throw(ErreurLLM("panne"))
+    ctx.llm.recherche = ("", [])  # recherche web vide : fiche minimale
+    orchestrateur.cycle()
+    [d] = ctx.store.lister()
+    assert d.statut == Statut.enquetee and d.fiche_entreprise.minimale
+    assert orchestrateur.reprendre_enquetes() == 1
+    assert ctx.store.get(d.id).statut == Statut.scoree

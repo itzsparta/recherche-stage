@@ -86,7 +86,10 @@ réglé par `gemini_reflexion` (`low`) et `gemini_reflexion_critique` (`medium`)
 le défaut de Google (`high`) rend chaque appel nettement plus lent. Un modèle
 saturé (503/429) est remplacé par le suivant de `gemini_modele_secours`, et
 n'est plus réessayé jusqu'à la fin de la commande ; de même pour un appel qui
-dépasse `gemini_delai_secondes` (180 s). `rs cycle` affiche son
+dépasse `gemini_delai_secondes` (180 s). Quand le quota (429) est atteint sur toute la
+chaîne, le cycle s'arrête sans pénaliser les dossiers et une escalade `quota`
+l'indique ; `rs reprendre-enquetes` relance ensuite l'Enquête des dossiers non
+rédigés dont la fiche est restée minimale. `rs cycle` affiche son
 avancement étape par étape.
 
 ## Démarrage

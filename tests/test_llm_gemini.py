@@ -167,3 +167,19 @@ def test_delai_depasse_bascule_puis_erreur_explicite(serveur, horloge):
     assert llm.structurer("suivi", "s", "c", Classification).categorie == "autre"  # 3.8 trop lent → 3.7
     with pytest.raises(ErreurLLM, match="trop lent"):
         llm.structurer("suivi", "s", "c", Classification)  # 3.7 trop lent à son tour, plus de secours
+
+
+def test_quota_epuise_sur_toute_la_chaine(serveur, horloge):
+    from recherche_stage.llm import QuotaEpuise
+
+    quota = {"_statut": 429, "error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
+             "message": "You exceeded your current quota, please check your plan and billing details.",
+             "details": [{"@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                          "violations": [{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}]}}
+    serveur.reponses += [json.loads(json.dumps(quota)) for _ in range(2)]
+    client = genai.Client(api_key="test", http_options={"base_url": serveur.url, "retry_options": {"attempts": 1}})
+    params = ParamsLLM(fournisseur="gemini", gemini_modele_secours=["gemini-3.7-flash"])
+    llm = GeminiLLM(params, Store(":memory:", horloge=horloge), 10, client=client)
+    with pytest.raises(QuotaEpuise, match="pour la journée sur gemini-3.7-flash et ses modèles de secours"):
+        llm.structurer("redaction", "s", "c", Classification)
+    assert len(serveur.requetes) == 2

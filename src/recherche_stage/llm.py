@@ -31,6 +31,11 @@ class BudgetEpuise(RuntimeError):
     pass
 
 
+class QuotaEpuise(BudgetEpuise):
+    """Quota du fournisseur atteint (429) sur tous les modèles disponibles :
+    inutile de continuer le cycle, chaque appel échouerait aussi."""
+
+
 class LLM(Protocol):
     def structurer(self, agent: str, systeme: str, contenu: str, schema: type[T], critique: bool = False) -> T: ...
 

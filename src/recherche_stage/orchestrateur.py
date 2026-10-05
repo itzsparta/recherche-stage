@@ -25,7 +25,7 @@ from .agents.scoring import AgentScoring
 from .agents.suivi import AgentSuivi
 from .agents.veille import AgentVeille
 from .canaux.messagerie import Boite, Expediteur
-from .llm import BudgetEpuise, ErreurLLM
+from .llm import BudgetEpuise, ErreurLLM, QuotaEpuise
 from .modeles import Dossier, Statut
 from .reseau import ErreurReseau
 from .sources import Source
@@ -109,6 +109,14 @@ class Orchestrateur:
         rapport: Counter = Counter()
         try:
             self._cycle(rapport, collecter, envoyer, suivre)
+        except QuotaEpuise as e:
+            rapport["quota_epuise"] += 1
+            self.progres(f"Arrêt du cycle : {e}")
+            self._escalader(
+                None, "quota",
+                f"{e}. Le travail fait est conservé ; relancer rs cycle après la remise à zéro du quota "
+                "(quotidienne, vers 9 h à Paris) ou activer la facturation de la clé sur aistudio.google.com.",
+            )
         except BudgetEpuise as e:
             rapport["budget_epuise"] += 1
             self._escalader(None, "budget", f"{e}. Le pipeline reprendra lundi (ou relever appels_api_max_par_semaine).")
@@ -302,6 +310,19 @@ class Orchestrateur:
         dossier.tracer("humain", f"validation:{etape}", self.store.memoriser_entrees({"modifie": modifie, "diff": diff}))
         self.store.save(dossier)
         return etape
+
+    def reprendre_enquetes(self) -> int:
+        """Renvoie à l'Enquête les dossiers pas encore rédigés dont la fiche est
+        restée minimale (recherche web en échec, quota atteint…)."""
+        repris = 0
+        for dossier in self.store.lister([Statut.enquetee]):
+            if dossier.fiche_entreprise and dossier.fiche_entreprise.minimale and not dossier.documents.version:
+                dossier.statut = Statut.scoree
+                dossier.tracer(self.nom, "enquete_reprise")
+                self.store.save(dossier)
+                repris += 1
+        self.store.journaliser(self.nom, "enquetes_reprises", details={"dossiers": repris})
+        return repris
 
     def rejeter(self, dossier_id: str, motif: str = "") -> None:
         dossier = self._dossier(dossier_id)

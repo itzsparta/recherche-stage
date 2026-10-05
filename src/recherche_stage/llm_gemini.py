@@ -16,7 +16,7 @@ from typing import TypeVar
 from pydantic import BaseModel, ValidationError
 
 from .config import ParamsLLM, secret
-from .llm import LLM, BudgetEpuise, ErreurLLM
+from .llm import LLM, BudgetEpuise, ErreurLLM, QuotaEpuise
 from .store import Store
 
 T = TypeVar("T", bound=BaseModel)
@@ -86,6 +86,12 @@ class GeminiLLM:
                 self.satures.add(modele)
                 self.store.journaliser(agent, "llm_secours", details={"modele": modele, "secours": secours, "code": e.code})
                 return self._generer(agent, secours, contenu, config)
+            if e.code == 429:
+                par_jour = "perday" in f"{e.message} {e.details}".lower()
+                raise QuotaEpuise(
+                    f"Quota Gemini atteint{' pour la journée' if par_jour else ''} sur {modele}"
+                    f"{' et ses modèles de secours' if self.satures else ''} [{str(e.message or '')[:160]}]"
+                ) from e
             if e.code in (429, 503):
                 raise ErreurLLM(
                     f"{agent} : Gemini surchargé ou quota atteint ({e.code}) malgré 3 essais "

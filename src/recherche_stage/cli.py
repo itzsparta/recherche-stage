@@ -11,6 +11,7 @@
     rs marquer-envoye <id> <preuve>  dépôt manuel effectué
     rs liberer-envoi <id> [--nature relance1]
     rs statut                        tableau de bord
+    rs reprendre-enquetes            relance l'Enquête des dossiers non rédigés à fiche minimale
     rs journal [<id>]                journal centralisé
     rs rejouer <id>                  entrées de chaque décision d'un dossier
     rs bilan [--appliquer]           bilan d'apprentissage et application des propositions
@@ -178,6 +179,11 @@ def cmd_liberer_envoi(args) -> None:
     print("Réservation d'envoi supprimée : le dossier pourra être renvoyé.")
 
 
+def cmd_reprendre_enquetes(args) -> None:
+    _, orchestrateur = construire(args.config)
+    print(f"{orchestrateur.reprendre_enquetes()} dossier(s) renvoyé(s) à l'Enquête : rs cycle")
+
+
 def cmd_statut(args) -> None:
     ctx, _ = construire(args.config)
     store, cfg = ctx.store, ctx.config
@@ -287,6 +293,7 @@ def main(argv: list[str] | None = None) -> None:
 
     sous.add_parser("file").set_defaults(func=cmd_file)
     sous.add_parser("statut").set_defaults(func=cmd_statut)
+    sous.add_parser("reprendre-enquetes").set_defaults(func=cmd_reprendre_enquetes)
 
     p = sous.add_parser("voir")
     p.add_argument("id")
