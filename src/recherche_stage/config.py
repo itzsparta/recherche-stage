@@ -39,8 +39,8 @@ class ParamsLLM(BaseModel):
     recherche_web: bool = True
     # Claude Code (`fournisseur: claude_code`) : alias de modèle de la commande `claude`
     claude_code_commande: str = "claude"
-    claude_code_modele: str = "sonnet"
-    claude_code_modele_critique: str = "sonnet"
+    claude_code_modele: str = "claude-sonnet-5-5"
+    claude_code_modele_critique: str = "claude-sonnet-5-5"
     claude_code_delai_secondes: float = 300
     # Gemini (clé dans la variable d'environnement nommée ci-dessous)
     gemini_modele: str = "gemini-3.8-flash"

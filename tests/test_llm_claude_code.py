@@ -50,7 +50,7 @@ def test_sortie_structuree_sans_outil_ni_texte_libre_en_argument(horloge, monkey
     appel = commande.appels[0]
     args = appel["commande"]
     assert args[:2] == ["claude", "-p"] and args[args.index("--tools") + 1] == ""
-    assert args[args.index("--model") + 1] == "sonnet" and args[args.index("--effort") + 1] == "medium"
+    assert args[args.index("--model") + 1] == "claude-sonnet-5-5" and args[args.index("--effort") + 1] == "medium"
     assert appel["input"] == "Bonjour, entretien mardi"  # contenu par l'entrée standard
     assert appel["systeme"].startswith("Classe ce mail.") and '"categorie"' in appel["systeme"]
     assert "--json-schema" in args
