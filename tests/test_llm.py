@@ -23,7 +23,7 @@ class Serveur:
         class Gestionnaire(BaseHTTPRequestHandler):
             def do_POST(self):
                 corps = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                serveur.requetes.append((dict(self.headers), corps))
+                serveur.requetes.append((dict(self.headers) | {"_chemin": self.path}, corps))
                 donnee = serveur.reponses.pop(0)
                 code = donnee.pop("_statut", 200)
                 reponse = json.dumps(donnee).encode()

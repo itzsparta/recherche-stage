@@ -39,6 +39,7 @@ class ParamsLLM(BaseModel):
     # Gemini (clé dans la variable d'environnement nommée ci-dessous)
     gemini_modele: str = "gemini-3.8-flash"
     gemini_modele_critique: str = "gemini-3.8-flash"
+    gemini_modele_secours: str | None = "gemini-2.5-flash"  # si le modèle principal est saturé (503/429)
     gemini_cle_env: str = "GEMINI_API_KEY"
     temperature_critique: float = 0.1  # appliquée par Gemini 1.x et 2.x seulement ; Claude et Gemini 3+ la déconseillent
 

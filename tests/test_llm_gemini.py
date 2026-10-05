@@ -67,10 +67,22 @@ def test_503_reessaye_puis_reussit(serveur, horloge):
     assert len(serveur.requetes) == 2
 
 
+def test_503_bascule_sur_le_modele_de_secours(serveur, horloge):
+    serveur.reponses += [{"_statut": 503, "error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}},
+                         reponse('{"concerne_candidature": false, "categorie": "autre", "confiance": 0.5, "date_entretien": "", "resume": ""}')]
+    llm = gemini(serveur, horloge)
+    assert llm.structurer("suivi", "s", "c", Classification).categorie == "autre"
+    assert "gemini-3.8-flash" in serveur.requetes[0][0]["_chemin"]
+    assert "gemini-2.5-flash" in serveur.requetes[1][0]["_chemin"]
+    assert any(e["action"] == "llm_secours" for e in llm.store.journal())
+
+
 def test_503_persistant_message_explicite(serveur, horloge):
     serveur.reponses.append({"_statut": 503, "error": {"code": 503, "message": "overloaded", "status": "UNAVAILABLE"}})
+    client = genai.Client(api_key="test", http_options={"base_url": serveur.url, "retry_options": {"attempts": 1}})
+    params = ParamsLLM(fournisseur="gemini", gemini_modele_secours=None)
     with pytest.raises(ErreurLLM, match="surchargé"):
-        gemini(serveur, horloge).structurer("suivi", "s", "c", Classification)
+        GeminiLLM(params, Store(":memory:", horloge=horloge), 10, client=client).structurer("suivi", "s", "c", Classification)
 
 
 def test_reponse_bloquee(serveur, horloge):

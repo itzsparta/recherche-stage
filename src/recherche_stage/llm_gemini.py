@@ -35,7 +35,7 @@ class GeminiLLM:
             # Gemini répond souvent 503 (surcharge) ou 429 : le SDK ne réessaie pas par défaut.
             client = genai.Client(
                 api_key=secret(params.gemini_cle_env),
-                http_options={"retry_options": {"attempts": 5, "initial_delay": 2, "max_delay": 30}},
+                http_options={"retry_options": {"attempts": 3, "initial_delay": 2, "max_delay": 30}},
             )
         self.client = client
 
@@ -47,15 +47,20 @@ class GeminiLLM:
         from google.genai import errors
 
         self._verifier_budget()
-        config = {**config, "automatic_function_calling": {"disable": True}}  # aucun outil Python à appeler
+        options = {**config, "automatic_function_calling": {"disable": True}}  # aucun outil Python à appeler
         try:
-            reponse = self.client.models.generate_content(model=modele, contents=contenu, config=config)
+            reponse = self.client.models.generate_content(model=modele, contents=contenu, config=options)
         except errors.APIError as e:
             if e.code in (400, 401, 403) and "key" in str(e.message or "").lower():
                 raise ErreurLLM(f"{agent} : clé Gemini refusée ({e.code}). Vérifier {self.params.gemini_cle_env}") from e
+            secours = self.params.gemini_modele_secours
+            if e.code in (429, 503) and secours and secours != modele:
+                # Modèle saturé (fréquent à la sortie d'un modèle) : on bascule plutôt que d'échouer.
+                self.store.journaliser(agent, "llm_secours", details={"modele": modele, "secours": secours, "code": e.code})
+                return self._generer(agent, secours, contenu, config)
             if e.code in (429, 503):
                 raise ErreurLLM(
-                    f"{agent} : Gemini surchargé ou quota atteint ({e.code}) malgré 5 essais "
+                    f"{agent} : Gemini surchargé ou quota atteint ({e.code}) malgré 3 essais "
                     f"[{modele} : {str(e.message or '')[:200]}]. Relancer dans quelques minutes "
                     "ou changer gemini_modele dans config.yaml"
                 ) from e
