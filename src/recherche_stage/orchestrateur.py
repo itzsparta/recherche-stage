@@ -107,6 +107,8 @@ class Orchestrateur:
 
     def cycle(self, collecter: bool = True, envoyer: bool = True, suivre: bool = True) -> Counter:
         rapport: Counter = Counter()
+        # Nouvel essai : les alertes du cycle précédent seront relevées si elles persistent.
+        self.store.fermer_escalades_globales(("quota", "budget", "suivi"), "nouveau cycle")
         try:
             self._cycle(rapport, collecter, envoyer, suivre)
         except QuotaEpuise as e:
@@ -114,8 +116,9 @@ class Orchestrateur:
             self.progres(f"Arrêt du cycle : {e}")
             self._escalader(
                 None, "quota",
-                f"{e}. Le travail fait est conservé ; relancer rs cycle après la remise à zéro du quota "
-                "(quotidienne, vers 9 h à Paris) ou activer la facturation de la clé sur aistudio.google.com.",
+                f"{e}. Le travail fait est conservé ; relancer rs cycle après la remise à zéro "
+                + ("indiquée ci-dessus." if self.ctx.config.llm.fournisseur == "claude_code" else
+                   "du quota (quotidienne, vers 9 h à Paris) ou activer la facturation de la clé sur aistudio.google.com."),
             )
         except BudgetEpuise as e:
             rapport["budget_epuise"] += 1

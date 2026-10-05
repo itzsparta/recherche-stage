@@ -260,6 +260,21 @@ class Store:
             (self._maintenant(), reponse, dossier_id),
         )
 
+    def fermer_escalade(self, id_: int, reponse: str = "") -> bool:
+        curseur = self.cx.execute(
+            "UPDATE escalades SET resolue = ?, reponse = ? WHERE id = ? AND resolue IS NULL",
+            (self._maintenant(), reponse, id_),
+        )
+        return curseur.rowcount > 0
+
+    def fermer_escalades_globales(self, types: tuple[str, ...], reponse: str = "") -> None:
+        """Escalades sans dossier (quota, budget…) : à refermer quand on réessaie."""
+        self.cx.execute(
+            f"UPDATE escalades SET resolue = ?, reponse = ? WHERE dossier_id IS NULL AND resolue IS NULL "
+            f"AND type IN ({', '.join('?' * len(types))})",
+            (self._maintenant(), reponse, *types),
+        )
+
     # ------------------------------------------------------ décisions humaines
 
     def enregistrer_decision(self, dossier_id: str, decision: str, diff: str = "") -> None:

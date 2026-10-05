@@ -230,3 +230,11 @@ def test_boite_imap_injoignable_erreur_explicite(monkeypatch):
     boite = BoiteIMAP(ParamsIMAP(hote="127.0.0.1", port=port, utilisateur="moi@exemple.fr"))
     with pytest.raises(ErreurReseau, match=f"127.0.0.1:{port}"):
         boite.messages_depuis(datetime(2026, 1, 1))
+
+
+def test_spontanee_sans_adresse_ne_parle_pas_de_formulaire(ctx):
+    d = dossier_valide(ctx, type="spontanee", source="annuaire", contact_email="",
+                       url="https://annuaire-entreprises.data.gouv.fr/entreprise/123456789")
+    AgentEnvoi(ctx).preparer(d)
+    [alerte] = ctx.store.escalades_ouvertes()
+    assert "aucune adresse publique" in alerte["question"] and "formulaire →" not in alerte["question"]

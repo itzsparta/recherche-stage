@@ -214,7 +214,17 @@ def test_quota_epuise_arrete_le_cycle_sans_penaliser_les_dossiers(orchestrateur,
     assert rapport["quota_epuise"] == 1 and "Suivi de la boîte mail…" not in affiche
     [d] = ctx.store.lister()
     assert d.statut == Statut.enquetee and not any(h.action.startswith("erreur") for h in d.historique)
-    assert [e["type"] for e in ctx.store.escalades_ouvertes()] == ["quota"]
+    [alerte] = ctx.store.escalades_ouvertes()
+    assert alerte["type"] == "quota" and "aistudio" in alerte["question"]
+    ctx.llm.reponses["redaction"] = sortie_redaction()
+    orchestrateur.cycle(collecter=False)  # quota revenu : l'alerte est refermée
+    assert "quota" not in [e["type"] for e in ctx.store.escalades_ouvertes()]
+
+
+def test_fermer_un_element_de_la_file(ctx):
+    numero = ctx.store.escalader(None, "deadline", "question")
+    assert ctx.store.fermer_escalade(numero, "vu") and not ctx.store.escalades_ouvertes()
+    assert not ctx.store.fermer_escalade(numero)
 
 
 def test_reprendre_enquetes_des_fiches_minimales(orchestrateur, ctx):

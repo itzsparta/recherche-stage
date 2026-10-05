@@ -11,6 +11,7 @@
     rs marquer-envoye <id> <preuve>  dépôt manuel effectué
     rs liberer-envoi <id> [--nature relance1]
     rs statut                        tableau de bord
+    rs fermer <n°> [note]            retire un élément de rs file (alerte traitée)
     rs reprendre-enquetes            relance l'Enquête des dossiers non rédigés à fiche minimale
     rs journal [<id>]                journal centralisé
     rs rejouer <id>                  entrées de chaque décision d'un dossier
@@ -179,6 +180,13 @@ def cmd_liberer_envoi(args) -> None:
     print("Réservation d'envoi supprimée : le dossier pourra être renvoyé.")
 
 
+def cmd_fermer(args) -> None:
+    ctx, _ = construire(args.config)
+    if not ctx.store.fermer_escalade(args.numero, " ".join(args.note)):
+        sys.exit(f"Aucun élément ouvert n° {args.numero} dans rs file")
+    print("Élément retiré de la file.")
+
+
 def cmd_reprendre_enquetes(args) -> None:
     _, orchestrateur = construire(args.config)
     print(f"{orchestrateur.reprendre_enquetes()} dossier(s) renvoyé(s) à l'Enquête : rs cycle")
@@ -294,6 +302,11 @@ def main(argv: list[str] | None = None) -> None:
     sous.add_parser("file").set_defaults(func=cmd_file)
     sous.add_parser("statut").set_defaults(func=cmd_statut)
     sous.add_parser("reprendre-enquetes").set_defaults(func=cmd_reprendre_enquetes)
+
+    p = sous.add_parser("fermer")
+    p.add_argument("numero", type=int)
+    p.add_argument("note", nargs="*")
+    p.set_defaults(func=cmd_fermer)
 
     p = sous.add_parser("voir")
     p.add_argument("id")

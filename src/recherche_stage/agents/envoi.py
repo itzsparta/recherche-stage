@@ -108,10 +108,13 @@ class AgentEnvoi(Agent):
             dossier.statut = Statut.en_attente_humain
             dossier.etape_attente = "envoi"
             dossier.motif = "validation_envoi"
+            ou = f"{canal} → {destinataire}"
+            if canal != "email" and dossier.offre.type == "spontanee":
+                ou = f"aucune adresse publique trouvée : passer par le site de l'entreprise ; fiche : {destinataire}"
             self.escalader(
                 dossier,
                 "validation_envoi",
-                f"« {dossier.offre.intitule} » chez {dossier.offre.entreprise} ({canal} → {destinataire}) prêt. "
+                f"« {dossier.offre.intitule} » chez {dossier.offre.entreprise} ({ou}) prêt. "
                 f"Relire {fichiers} puis : rs valider {dossier.id} [--modifie] ou rs rejeter {dossier.id}. "
                 f"Raisons : {', '.join(raisons)}",
             )
