@@ -180,6 +180,7 @@ class Presentiel(BaseModel):
     distance_km: float | None = None
     raison: str = ""
     adresse: str = ""
+    depose_le: datetime | None = None  # passé la déposer (tournée)
 
 
 class Dossier(BaseModel):

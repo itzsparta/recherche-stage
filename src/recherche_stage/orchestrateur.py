@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import controles
-from .agents.apprentissage import AgentApprentissage
+from .agents.apprentissage import PREFIXE_MOTIF, AgentApprentissage
 from .agents.base import Contexte
 from .agents.critique import AgentCritique
 from .agents.enquete import AgentEnquete
@@ -436,7 +436,9 @@ class Orchestrateur:
     def rejeter(self, dossier_id: str, motif: str = "") -> None:
         dossier = self._dossier(dossier_id)
         etape = dossier.etape_attente or "hors_etape"
-        self.store.enregistrer_decision(dossier.id, "rejete" if etape == "envoi" else f"{etape}:rejete")
+        motif = motif.strip()
+        self.store.enregistrer_decision(dossier.id, "rejete" if etape == "envoi" else f"{etape}:rejete",
+                                        f"{PREFIXE_MOTIF}{motif}" if motif else "")
         if etape.startswith("relance:"):
             # Refuser une relance ne retire pas la candidature : on passe à l'échéance suivante.
             dossier.suivi.relances.append(self.ctx.horloge())
@@ -466,6 +468,27 @@ class Orchestrateur:
         self.envoi.marquer_envoye(dossier, preuve)
         dossier.etape_attente = ""
         self.store.resoudre_escalades(dossier.id, "envoyé manuellement")
+        self.store.save(dossier)
+        self.mettre_a_jour_excel()
+
+    def deposer_sur_place(self, dossier_id: str) -> None:
+        """La candidature a été apportée en main propre (tournée présentiel).
+        Si elle n'était pas encore partie, ce dépôt vaut envoi : le mail validé
+        n'est alors plus envoyé (jamais deux candidatures à la même entreprise)."""
+        dossier = self._dossier(dossier_id)
+        if not (dossier.presentiel and dossier.presentiel.conseille):
+            raise ValueError(f"{dossier.offre.entreprise} n'est pas dans la tournée")
+        if dossier.presentiel.depose_le:
+            raise ValueError(f"{dossier.offre.entreprise} est déjà marquée déposée")
+        maintenant = self.ctx.horloge()
+        dossier.presentiel.depose_le = maintenant
+        dossier.tracer("humain", "depot_presentiel")
+        if dossier.statut == Statut.validee or dossier.etape_attente == "depot":
+            dossier.envoi.canal = None  # ni mail ni site : en main propre
+            lieu = f" ({dossier.presentiel.adresse})" if dossier.presentiel.adresse else ""
+            self.envoi.marquer_envoye(dossier, f"déposée en main propre le {maintenant:%d/%m/%Y}{lieu}")
+            dossier.etape_attente = ""
+            self.store.resoudre_escalades(dossier.id, "déposée en main propre")
         self.store.save(dossier)
         self.mettre_a_jour_excel()
 

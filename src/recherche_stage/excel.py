@@ -272,8 +272,9 @@ def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | No
             if champ == "statut":
                 etat = _etat(d)
                 valeur = _choisir(_liste_deroulante(ws, cellule), MOTS_STATUT[etat], LIBELLES_STATUT[etat])
-            elif champ in DESCRIPTIFS and not nouvelle and cellule.value not in (None, ""):
-                continue  # saisi à la main (nom, notes…) : intouchable
+            elif (champ in DESCRIPTIFS and not nouvelle and cellule.value not in (None, "")
+                  and not (champ == "presentiel" and str(cellule.value).startswith("Oui : "))):
+                continue  # saisi à la main (nom, notes…) : intouchable ; « Oui : » vient de l'outil
             else:
                 valeur = champs[champ]
             if valeur in (None, ""):

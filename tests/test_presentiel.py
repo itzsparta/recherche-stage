@@ -123,3 +123,17 @@ def test_annuaire_garde_les_coordonnees_de_l_etablissement(ctx):
                                      "latitude": "50.667", "longitude": "1.833"}],
     }, "Stage ingénieur", "62")
     assert (o.latitude, o.longitude, o.tranche_effectif) == (50.667, 1.833, "11") and o.adresse.startswith("12 RUE")
+
+
+def test_ordre_de_tournee_itineraires_et_excel_apres_depot():
+    from datetime import datetime
+
+    from recherche_stage.modeles import Presentiel
+    from recherche_stage.presentiel import itineraires, ordonner, texte_excel
+
+    assert ordonner(BOULOGNE, [("loin", LAIGNEVILLE), ("inconnu", None), ("proche", DESVRES)]) == ["proche", "loin", "inconnu"]
+    liens = itineraires("Calais", [f"arret {i}" for i in range(12)])
+    assert len(liens) == 2 and liens[0].startswith("https://www.google.com/maps/dir/Calais/arret%200/")
+    assert liens[1].startswith("https://www.google.com/maps/dir/arret%208/arret%209/")  # repart du dernier arrêt
+    p = Presentiel(conseille=True, raison="à 5 km", adresse="1 rue X", depose_le=datetime(2026, 12, 8))
+    assert texte_excel(p) == "Fait : déposée le 08/12/2026 — 1 rue X"

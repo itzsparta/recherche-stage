@@ -120,3 +120,64 @@ def test_serveur_page_jeton_et_hote(serveur, app):
     statut, corps = appel(serveur + "/api/action", {"action": "valider", "dossier": "inconnu"},
                           **{"X-Jeton": app.jeton, "Content-Type": "application/json"})
     assert statut == 409 and "inconnu" in corps
+
+
+def test_mes_candidatures_reponse_et_motif_de_rejet(app, ctx):
+    from recherche_stage.agents.apprentissage import AgentApprentissage
+
+    d = carte(app, "Exemple Énergie")["dossier"]
+    assert d["justification"] and d["url"] and d["source"]
+    app.action({"action": "valider", "dossier": d["id"]})
+    app.action({"action": "rejeter", "dossier": carte(app, "Autre Énergie")["dossier"]["id"], "motif": "Trop loin"})
+    sans = carte(app, "Sans Adresse")["dossier"]["id"]
+    app.action({"action": "valider", "dossier": sans})
+    app.action({"action": "deposer", "dossier": sans, "preuve": "site carrières"})
+
+    lignes = {c["entreprise"]: c for c in app.etat()["candidatures"]}
+    assert lignes["Exemple Énergie"]["etat"] == "À envoyer" and not lignes["Exemple Énergie"]["repondable"]
+    assert lignes["Autre Énergie"]["etat"] == "Rejetée" and lignes["Autre Énergie"]["motif"] == "Trop loin"
+    envoyee = lignes["Sans Adresse"]
+    assert envoyee["etat"] == "Envoyée" and envoyee["repondable"]
+    assert (envoyee["prochaine_relance"] - envoyee["envoyee_le"]).days == 7
+    assert AgentApprentissage(ctx).motifs_rejet() == [("trop loin", 1)]
+
+    assert "Refus" in app.action({"action": "reponse", "dossier": sans, "categorie": "refus"})
+    assert par_entreprise(ctx, "Sans Adresse").statut == Statut.refus
+    with pytest.raises(Refus, match="déjà enregistrée"):
+        app.action({"action": "reponse", "dossier": sans, "categorie": "refus"})
+    with pytest.raises(Refus, match="inconnue"):
+        app.action({"action": "reponse", "dossier": sans, "categorie": "acceptee"})
+
+
+def test_tournee_sur_place(app, ctx):
+    from recherche_stage.modeles import Presentiel
+
+    ctx.config.presentiel.domicile = "Boulogne-sur-Mer"
+    ctx.store.definir_parametre("geo:boulogne-sur-mer", [50.7264, 1.6147])
+    proche, loin = par_entreprise(ctx, "Exemple Énergie"), par_entreprise(ctx, "Sans Adresse")
+    for d, point, km in ((proche, (50.667, 1.833), 17), (loin, (50.95, 1.86), 30)):
+        d.offre.latitude, d.offre.longitude = point
+        d.presentiel = Presentiel(conseille=True, distance_km=km, raison=f"à {km} km", adresse=f"1 rue {d.offre.entreprise}")
+        ctx.store.save(d)
+    assert app.etat()["tournee"]["arrets"] == [] and app.etat()["tournee"]["a_valider"] == 2  # rien de validé
+
+    app.action({"action": "valider", "dossier": proche.id})  # mail validé, pas encore parti
+    app.action({"action": "valider", "dossier": loin.id})  # sans adresse : à déposer
+    t = app.etat()["tournee"]
+    assert [a["entreprise"] for a in t["arrets"]] == ["Exemple Énergie", "Sans Adresse"]
+    assert t["itineraires"][0].startswith("https://www.google.com/maps/dir/Boulogne-sur-Mer/1%20rue%20Exemple")
+
+    # Déposée en main propre : vaut envoi, le mail validé ne partira plus.
+    app.action({"action": "sur_place", "dossier": proche.id})
+    d = par_entreprise(ctx, "Exemple Énergie")
+    assert d.statut == Statut.envoyee and d.presentiel.depose_le and ctx.store.etat_envoi(d.id) == "envoye"
+    assert "main propre" in d.envoi.preuve
+    with pytest.raises(Refus, match="déjà marquée"):
+        app.action({"action": "sur_place", "dossier": proche.id})
+
+    app.action({"action": "sur_place", "dossier": loin.id})
+    assert par_entreprise(ctx, "Sans Adresse").statut == Statut.envoyee
+    etat = app.etat()
+    assert etat["tournee"]["arrets"] == [] and [e["dossier"]["entreprise"] for e in etat["file"]] == ["Autre Énergie"]
+    with pytest.raises(Refus, match="pas dans la tournée"):
+        app.action({"action": "sur_place", "dossier": par_entreprise(ctx, "Autre Énergie").id})

@@ -19,6 +19,7 @@
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin: 0; background: var(--fond); color: var(--texte);
          font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 980px; margin: 0 auto; padding: 24px 16px 80px; }
@@ -34,7 +35,8 @@
   label.case { display: inline-flex; align-items: center; gap: 6px; color: var(--doux); font-size: 14px; cursor: pointer; }
   button { font: inherit; font-size: 14px; border-radius: 8px; padding: 7px 14px; cursor: pointer;
            border: 1px solid var(--bord); background: var(--carte); color: var(--texte); }
-  button:hover:not(:disabled) { border-color: var(--doux); }
+  a.bouton { font-size: 14px; border-radius: 8px; padding: 7px 14px; border: 1px solid var(--bord); color: var(--texte); text-decoration: none; }
+  button:hover:not(:disabled), a.bouton:hover { border-color: var(--doux); }
   button:disabled { opacity: .5; cursor: default; }
   button.principal { background: var(--accent); color: var(--accent-texte); border-color: var(--accent); font-weight: 600; }
   button.danger { color: var(--non); }
@@ -64,6 +66,50 @@
   .actions .modifie { font-size: 12.5px; color: var(--avert); display: none; }
   .depot { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--champ); border: 1px dashed var(--bord); font-size: 14px; }
   .vide { color: var(--doux); text-align: center; padding: 30px; }
+  .onglets { display: flex; gap: 4px; margin: 28px 0 14px; border-bottom: 1px solid var(--bord); overflow-x: auto; }
+  .onglets button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--doux);
+                    padding: 8px 12px; white-space: nowrap; margin-bottom: -1px; }
+  .onglets button[aria-selected=true] { color: var(--texte); border-bottom-color: var(--accent); font-weight: 600; }
+  .onglets button:hover:not(:disabled) { border-color: transparent; color: var(--texte); }
+  .onglets button[aria-selected=true]:hover { border-bottom-color: var(--accent); }
+  .pourquoi { font-size: 13.5px; margin: 6px 0 4px; }
+  .pourquoi b { font-weight: 600; }
+  .tiroir { margin-top: 12px; padding: 12px; border: 1px solid var(--bord); border-radius: 10px; background: var(--champ); }
+  .tiroir .actions { margin-top: 10px; }
+  .puces { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  button.puce { font-size: 13px; padding: 3px 10px; border-radius: 99px; }
+  .outils { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .outils input { flex: 1 1 220px; }
+  select { font: inherit; font-size: 14px; color: var(--texte); background: var(--champ); border: 1px solid var(--bord); border-radius: 8px; padding: 7px 10px; }
+  table.liste { width: 100%; border-collapse: collapse; background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; overflow: hidden; font-size: 14px; }
+  .liste th { text-align: left; font-size: 12.5px; font-weight: 600; color: var(--doux); padding: 8px 12px; border-bottom: 1px solid var(--bord); }
+  .liste td { padding: 9px 12px; border-bottom: 1px solid var(--bord); vertical-align: top; }
+  .liste tr:last-child td { border-bottom: 0; }
+  .liste td.date { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .liste .du { color: var(--avert); font-weight: 600; }
+  .liste button { font-size: 13px; padding: 3px 10px; }
+  @media (max-width: 680px) {
+    .liste thead { display: none; }
+    .liste tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--bord); }
+    .liste td { display: block; border: 0; padding: 3px 12px; }
+    .liste td[data-titre]:empty { display: none; }
+    .liste td[data-titre]::before { content: attr(data-titre) " : "; color: var(--doux); font-size: 12.5px; }
+  }
+  ol.arrets { list-style: none; padding: 0; margin: 0; counter-reset: arret; }
+  ol.arrets > li { counter-increment: arret; position: relative; padding-left: 40px; }
+  ol.arrets > li::before { content: counter(arret); position: absolute; left: 16px; top: 16px; width: 24px; height: 24px; border-radius: 50%;
+                           background: var(--accent); color: var(--accent-texte); font-size: 13px; font-weight: 600; text-align: center; line-height: 24px; }
+  ol.arrets > li .carte { margin-left: 12px; }
+  #impression { display: none; }
+  @media print {
+    body { background: #fff; color: #000; }
+    main, #toast { display: none !important; }
+    #impression { display: block; font: 11pt/1.5 Georgia, "Times New Roman", serif; }
+    #impression h1 { font: 600 16pt system-ui, sans-serif; }
+    #impression .feuille + .feuille { break-before: page; }
+    #impression .lettre { white-space: pre-wrap; }
+    #impression li { margin-bottom: 8px; }
+  }
   #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: calc(100% - 32px);
            background: var(--texte); color: var(--fond); padding: 10px 16px; border-radius: 10px; font-size: 14px;
            opacity: 0; transition: opacity .2s; pointer-events: none; }
@@ -96,9 +142,27 @@
     <div class="actions"><button id="enregistrer-consignes">Enregistrer</button></div>
   </details>
 
-  <h2 id="titre-file">À traiter</h2>
-  <div id="file"></div>
+  <nav class="onglets" role="tablist" aria-label="Vues">
+    <button role="tab" id="onglet-file" data-vue="file">À traiter</button>
+    <button role="tab" id="onglet-candidatures" data-vue="candidatures">Mes candidatures</button>
+    <button role="tab" id="onglet-tournee" data-vue="tournee">Sur place</button>
+  </nav>
+  <section id="vue-file" role="tabpanel" aria-labelledby="onglet-file"><div id="file"></div></section>
+  <section id="vue-candidatures" role="tabpanel" aria-labelledby="onglet-candidatures" hidden>
+    <div class="outils">
+      <input type="text" id="recherche" placeholder="Rechercher une entreprise, un poste, une ville…" aria-label="Rechercher">
+      <select id="filtre" aria-label="Filtrer">
+        <option value="tout">Toutes</option>
+        <option value="en_cours">En cours</option>
+        <option value="reponses">Avec réponse</option>
+        <option value="rejetees">Rejetées</option>
+      </select>
+    </div>
+    <div id="candidatures"></div>
+  </section>
+  <section id="vue-tournee" role="tabpanel" aria-labelledby="onglet-tournee" hidden><div id="tournee"></div></section>
 </main>
+<div id="impression"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -113,6 +177,7 @@ let cycleEnCours = false;
 const el = (balise, attrs = {}, ...enfants) => {
   const n = document.createElement(balise);
   for (const [k, v] of Object.entries(attrs)) {
+    if (v === null || v === undefined || v === false) continue;
     if (k === "class") n.className = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
   }
   for (const e of enfants.flat()) if (e !== null && e !== undefined && e !== false) n.append(e.nodeType ? e : String(e));
@@ -137,6 +202,8 @@ async function rafraichir() {
   afficherChiffres(etat);
   afficherCycle(etat.cycle);
   afficherFile(etat.file);
+  afficherCandidatures(etat.candidatures);
+  afficherTournee(etat.tournee);
   return etat;
 }
 
@@ -160,7 +227,7 @@ function afficherChiffres(etat) {
 function afficherCycle(c) {
   cycleEnCours = c.en_cours;
   document.getElementById("lancer").disabled = c.en_cours;
-  document.querySelectorAll(".carte button").forEach(b => b.disabled = c.en_cours);
+  document.querySelectorAll(".carte button, .liste button").forEach(b => b.disabled = c.en_cours);
   const journal = document.getElementById("journal");
   const lignes = [...c.lignes];
   if (c.rapport) lignes.push("Terminé : " + (Object.entries(c.rapport).map(([k, v]) => `${k} ${v}`).join(", ") || "rien à faire"));
@@ -173,7 +240,7 @@ function afficherCycle(c) {
 
 function afficherFile(elements) {
   const conteneur = document.getElementById("file");
-  document.getElementById("titre-file").textContent = `À traiter (${elements.length})`;
+  document.getElementById("onglet-file").textContent = `À traiter (${elements.length})`;
   const cles = new Set(elements.map(e => cle(e)));
   // Les cartes déjà affichées sont gardées telles quelles : une correction en cours n'est pas perdue.
   [...conteneur.children].forEach(c => { if (!cles.has(c.dataset.cle)) c.remove(); });
@@ -210,10 +277,14 @@ function creerCarte(e) {
   if (d.presentiel) badges.push(el("span", { class: "badge ok", title: `${d.presentiel.raison}${d.presentiel.adresse ? " — " + d.presentiel.adresse : ""}` },
     `à déposer sur place · ${Math.round(d.presentiel.distance_km)} km`));
 
+  const lien = d.url ? el("span", {}, " · ", el("a", { href: d.url, target: "_blank", rel: "noreferrer" },
+    d.type === "spontanee" ? "fiche de l'entreprise ↗" : "voir l'offre ↗")) : "";
   carte.append(el("div", { class: "entete" },
-    el("div", {}, el("h3", {}, d.entreprise), el("div", { class: "sous" }, `${d.intitule} · ${d.lieu}`)),
+    el("div", {}, el("h3", {}, d.entreprise), el("div", { class: "sous" }, `${d.intitule} · ${d.lieu}`, lien)),
     el("div", { class: "badges" }, badges)));
   carte.append(el("p", { class: "question" }, resume(e)));
+  if (d.justification)
+    carte.append(el("p", { class: "pourquoi" }, el("b", {}, "Pourquoi cette entreprise : "), d.justification));
 
   const problemes = d.critique.problemes;
   if (problemes.length && d.etape !== "depot")
@@ -249,20 +320,22 @@ function creerCarte(e) {
   const bouton = (texte, classe, fn) => el("button", { class: classe, onclick: fn }, texte);
   for (const a of e.actions) {
     if (a === "valider") actions.append(bouton("Valider", "principal", () => agir(carte, { action: "valider", dossier: d.id, ...valeurs(champs) })));
-    if (a === "deposer") actions.append(bouton("C'est déposé", "principal", () => {
-      const preuve = prompt("Où et quand ? (ex. « site carrières, 06/10 »)", "site carrières, " + new Date().toLocaleDateString("fr-FR"));
-      if (preuve !== null) agir(carte, { action: "deposer", dossier: d.id, preuve });
-    }));
+    if (a === "deposer") actions.append(bouton("C'est déposé", "principal", () => tiroir(carte, {
+      titre: "Où l'as-tu déposée ?", puces: ["site carrières", "formulaire de contact", "en main propre", "par courrier"],
+      remplacer: true, valeur: "site carrières", libelle: "Enregistrer le dépôt", classe: "principal",
+    }, preuve => agir(carte, { action: "deposer", dossier: d.id, preuve: `${preuve || "déposée"}, ${new Date().toLocaleDateString("fr-FR")}` }))));
     if (a === "ouvrir") actions.append(bouton("Ouvrir le dossier", "", () => agir(carte, { action: "ouvrir", dossier: d.id }, false)));
     if (a === "fermer") actions.append(bouton("C'est noté, retirer", "", () => agir(carte, { action: "fermer", escalade: e.escalade })));
-    if (a === "reecrire") actions.append(bouton("Réécrire…", "", () => {
-      const consigne = prompt(`Que changer dans la candidature ${d.entreprise} ?\n(ex. « moins sur le TIPE, plus sur mon parcours académique »)`, "");
-      if (consigne && consigne.trim()) agir(carte, { action: "reecrire", dossier: d.id, consigne });
-    }));
-    if (a === "rejeter") actions.append(bouton("Rejeter", "danger", () => {
-      const motif = prompt(`Rejeter ${d.entreprise} ? Motif (facultatif) :`, "");
-      if (motif !== null) agir(carte, { action: "rejeter", dossier: d.id, motif });
-    }));
+    if (a === "reecrire") actions.append(bouton("Réécrire…", "", () => tiroir(carte, {
+      titre: "Que changer ? Clique une ou plusieurs idées, ou écris ta consigne. Rien ne sera inventé.",
+      puces: ["Plus court", "Plus technique", "Plus centré sur l'entreprise, moins générique", "Mettre en avant ma formation", "Ton plus direct"],
+      placeholder: "ex. moins sur le TIPE, plus sur mon parcours académique", requis: true, libelle: "Lancer la réécriture", classe: "principal",
+    }, consigne => agir(carte, { action: "reecrire", dossier: d.id, consigne }))));
+    if (a === "rejeter") actions.append(bouton("Rejeter", "danger", () => tiroir(carte, {
+      titre: `Pourquoi écarter ${d.entreprise} ? Le motif apparaît dans le bilan hebdomadaire pour mieux cibler ensuite (facultatif).`,
+      puces: ["trop loin", "hors de mes secteurs", "entreprise trop grande", "poste pas adapté", "déjà en contact"],
+      remplacer: true, libelle: "Rejeter", classe: "danger",
+    }, motif => agir(carte, { action: "rejeter", dossier: d.id, motif }))));
   }
   actions.append(el("span", { class: "modifie" }, "modifié : tes corrections seront enregistrées"));
   carte.append(actions);
@@ -296,6 +369,169 @@ async function agir(carte, donnees, retirer = true) {
     carte.querySelectorAll("button").forEach(b => b.disabled = cycleEnCours);
     await rafraichir();
   }
+}
+
+// Volet intégré à la carte (remplace les fenêtres prompt()).
+function tiroir(carte, o, envoyer) {
+  carte.querySelector(".tiroir")?.remove();
+  carte.querySelector(":scope > .actions").hidden = false;
+  const zone = el("textarea", { rows: 2, placeholder: o.placeholder || "", "aria-label": o.titre });
+  zone.value = o.valeur || "";
+  const ajouter = t => {
+    const v = zone.value.trim();
+    zone.value = o.remplacer || !v ? t : v + (/[.!?]$/.test(v) ? " " : ". ") + t;
+    zone.focus();
+  };
+  const boite = el("div", { class: "tiroir" },
+    el("div", { class: "sous" }, o.titre),
+    el("div", { class: "puces" }, o.puces.map(t => el("button", { type: "button", class: "puce", onclick: () => ajouter(t) }, t))),
+    zone,
+    el("div", { class: "actions" },
+      el("button", { class: o.classe || "", onclick: () => {
+        if (o.requis && !zone.value.trim()) { zone.focus(); toast("Écris ou choisis ce qu'il faut changer.", true); return; }
+        envoyer(zone.value.trim());
+      } }, o.libelle),
+      el("button", { onclick: () => { boite.remove(); principales.hidden = false; } }, "Annuler")));
+  const principales = carte.querySelector(":scope > .actions");
+  principales.before(boite);
+  principales.hidden = true;  // un seul jeu de boutons à la fois
+  zone.focus();
+}
+
+// ---------------------------------------------------------------- onglets
+const VUES = ["file", "candidatures", "tournee"];
+function montrerVue() {
+  const vue = VUES.includes(location.hash.slice(1)) ? location.hash.slice(1) : "file";
+  for (const v of VUES) {
+    document.getElementById("vue-" + v).hidden = v !== vue;
+    document.getElementById("onglet-" + v).setAttribute("aria-selected", String(v === vue));
+  }
+}
+document.querySelectorAll(".onglets button").forEach(b => b.addEventListener("click", () => {
+  history.replaceState(null, "", "#" + b.dataset.vue); montrerVue();
+}));
+window.addEventListener("hashchange", montrerVue);
+montrerVue();
+
+const jour = v => v ? new Date(String(v).replace(" ", "T")) : null;
+const dateCourte = v => v ? jour(v).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "";
+const sansAccents = t => (t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+// --------------------------------------------------------- mes candidatures
+let candidatures = [], dejaAffiche = "";
+const FILTRES = {
+  tout: () => true,
+  en_cours: c => ["validee", "en_attente_humain", "envoyee", "relancee"].includes(c.statut),
+  reponses: c => ["entretien", "refus", "acceptee"].includes(c.statut),
+  rejetees: c => c.statut === "abandonnee",
+};
+function afficherCandidatures(liste) {
+  candidatures = liste;
+  document.getElementById("onglet-candidatures").textContent = `Mes candidatures (${liste.filter(c => c.statut !== "abandonnee").length})`;
+  dessinerCandidatures();
+}
+function dessinerCandidatures(force = false) {
+  const q = sansAccents(document.getElementById("recherche").value);
+  const filtre = FILTRES[document.getElementById("filtre").value];
+  const lignes = candidatures.filter(c => filtre(c) && (!q || sansAccents(`${c.entreprise} ${c.intitule} ${c.lieu}`).includes(q)));
+  const signature = JSON.stringify([lignes, cycleEnCours]);
+  if (signature === dejaAffiche && !force) return;  // rien n'a changé : on ne redessine pas
+  dejaAffiche = signature;
+  const conteneur = document.getElementById("candidatures");
+  if (!candidatures.length) return conteneur.replaceChildren(el("div", { class: "vide" }, "Aucune candidature validée pour l'instant : elles apparaîtront ici dès ta première validation."));
+  if (!lignes.length) return conteneur.replaceChildren(el("div", { class: "vide" }, "Aucune candidature ne correspond."));
+  const maintenant = new Date();
+  conteneur.replaceChildren(el("table", { class: "liste" },
+    el("thead", {}, el("tr", {}, ["Entreprise", "Statut", "Envoyée", "Relance prévue", "Réponse"].map(t => el("th", {}, t)))),
+    el("tbody", {}, lignes.map(c => {
+      const reponse = el("td", { "data-titre": "Réponse" });
+      if (c.repondable) reponse.append(
+        el("button", { disabled: cycleEnCours || null, onclick: ev => repondre(ev.target, c, "entretien") }, "Entretien"), " ",
+        el("button", { class: "danger", disabled: cycleEnCours || null, onclick: ev => repondre(ev.target, c, "refus") }, "Refus"));
+      else if (c.statut === "entretien") reponse.append(c.entretien_le ? `entretien le ${dateCourte(c.entretien_le)}` : "entretien");
+      else if (c.statut === "abandonnee") reponse.append(c.motif ? `motif : ${c.motif}` : "");
+      else if (c.reponse !== "aucune") reponse.append(c.reponse.replace("_", " "));
+      const relance = jour(c.prochaine_relance);
+      const surPlace = c.sur_place ? (c.sur_place.depose_le ? ` · déposée sur place le ${dateCourte(c.sur_place.depose_le)}` : " · à déposer sur place") : "";
+      return el("tr", {},
+        el("td", {}, c.url ? el("a", { href: c.url, target: "_blank", rel: "noreferrer" }, c.entreprise) : el("b", {}, c.entreprise),
+          el("div", { class: "sous" }, `${c.intitule}${c.lieu ? " · " + c.lieu : ""}`)),
+        el("td", { "data-titre": "Statut" }, c.etat, el("span", { class: "sous" }, surPlace)),
+        el("td", { class: "date", "data-titre": "Envoyée" }, dateCourte(c.envoyee_le) || "—",
+          c.envoyee_le && c.canal === "email" ? el("div", { class: "sous" }, "par mail") : ""),
+        el("td", { class: "date", "data-titre": "Relance prévue" },
+          relance ? el("span", { class: relance <= maintenant ? "du" : "" }, dateCourte(c.prochaine_relance) + (relance <= maintenant ? " (due)" : "")) : "—"),
+        reponse);
+    }))));
+}
+async function repondre(bouton, c, categorie) {
+  if (bouton.dataset.confirme !== "1") {  // deux clics : une réponse ne s'annule pas
+    bouton.dataset.confirme = "1"; bouton.textContent = categorie === "refus" ? "Confirmer le refus" : "Confirmer l'entretien";
+    return;
+  }
+  bouton.disabled = true;
+  try {
+    toast(await poster("/api/action", { action: "reponse", dossier: c.id, categorie }));
+    if (categorie === "entretien") setTimeout(suivreCycle, 500);
+  } catch (err) { toast(err.message, true); }
+  await rafraichir();
+}
+document.getElementById("recherche").addEventListener("input", () => dessinerCandidatures());
+document.getElementById("filtre").addEventListener("change", () => dessinerCandidatures());
+
+// ------------------------------------------------------------------ tournée
+let tournee = null, tourneeAffichee = "";
+function afficherTournee(t) {
+  tournee = t;
+  document.getElementById("onglet-tournee").textContent = `Sur place (${t.arrets.length})`;
+  const signature = JSON.stringify([t, cycleEnCours]);
+  if (signature === tourneeAffichee) return;
+  tourneeAffichee = signature;
+  const conteneur = document.getElementById("tournee");
+  const attente = t.a_valider ? el("p", { class: "sous" }, `${t.a_valider} autre(s) candidature(s) à déposer sur place attendent ta validation dans « À traiter ».`) : "";
+  if (!t.arrets.length)
+    return conteneur.replaceChildren(el("div", { class: "vide" }, "Aucune candidature à apporter en main propre pour l'instant.", attente));
+  const outils = el("div", { class: "panneau" },
+    el("div", { class: "sous" }, `Départ : ${t.domicile || "domicile non renseigné"} · ${t.arrets.length} arrêt(s), dans l'ordre le plus court à vol d'oiseau.`),
+    el("div", { class: "actions" },
+      t.itineraires.map((u, i) => el("a", { class: "bouton", href: u, target: "_blank", rel: "noreferrer" },
+        t.itineraires.length > 1 ? `Itinéraire ${i + 1}/${t.itineraires.length} ↗` : "Itinéraire ↗")),
+      el("button", { class: "principal", onclick: imprimerTournee }, "Imprimer la tournée et les lettres")),
+    attente);
+  const liste = el("ol", { class: "arrets" }, t.arrets.map(a => {
+    const carte = el("article", { class: "carte" },
+      el("div", { class: "entete" },
+        el("div", {}, el("h3", {}, a.entreprise), el("div", { class: "sous" }, a.intitule)),
+        el("div", { class: "badges" }, a.distance_km != null ? el("span", { class: "badge" }, `${Math.round(a.distance_km)} km`) : "",
+          a.deja_envoyee ? el("span", { class: "badge" }, "déjà envoyée par mail") : "")),
+      el("p", { class: "question" }, el("a", { href: "https://www.openstreetmap.org/search?query=" + encodeURIComponent(a.adresse), target: "_blank", rel: "noreferrer" }, a.adresse + " ↗"),
+        "\n", a.raison, a.lettre ? "" : "\nLettre absente : l'imprimer depuis le dossier."),
+      el("div", { class: "actions" }, el("button", { class: "principal", disabled: cycleEnCours || null, onclick: ev => deposeSurPlace(ev.target, a) }, "Déposée ✓")));
+    return el("li", {}, carte);
+  }));
+  conteneur.replaceChildren(outils, el("div", { style: "margin-top:14px" }), liste);
+}
+async function deposeSurPlace(bouton, a) {
+  if (bouton.dataset.confirme !== "1") {
+    bouton.dataset.confirme = "1"; bouton.textContent = `Confirmer : déposée chez ${a.entreprise}`;
+    return;
+  }
+  bouton.disabled = true;
+  try { toast(await poster("/api/action", { action: "sur_place", dossier: a.id })); }
+  catch (err) { toast(err.message, true); }
+  await rafraichir();
+}
+function imprimerTournee() {
+  const t = tournee;
+  const aujourdhui = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  const feuilles = [el("section", { class: "feuille" },
+    el("h1", {}, `Tournée du ${aujourdhui}`),
+    el("p", {}, `Départ : ${t.domicile || "—"}. À emporter : ${t.arrets.length} CV imprimé(s) et les lettres qui suivent, chacune signée.`),
+    el("ol", {}, t.arrets.map(a => el("li", {}, "☐ ", el("b", {}, a.entreprise), ` — ${a.adresse}`,
+      a.distance_km != null ? ` (${Math.round(a.distance_km)} km)` : "", el("br"), a.intitule, a.lettre ? "" : " · lettre à imprimer depuis le dossier"))))];
+  for (const a of t.arrets) if (a.lettre) feuilles.push(el("section", { class: "feuille" }, el("div", { class: "lettre" }, a.lettre)));
+  document.getElementById("impression").replaceChildren(...feuilles);
+  window.print();
 }
 
 document.getElementById("lancer").addEventListener("click", async () => {

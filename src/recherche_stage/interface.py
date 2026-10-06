@@ -13,10 +13,12 @@ le lire ni le deviner) ; l'en-tête Host est vérifié (rebinding DNS).
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import threading
 import traceback
 from collections import Counter
+from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable
@@ -24,8 +26,10 @@ from urllib.parse import quote_plus
 
 from .agents.base import Contexte
 from .autonomie import envoi_automatique_debloque, taux_validation
-from .modeles import Dossier
+from .excel import LIBELLES_STATUT, _etat, a_exporter
+from .modeles import Dossier, Statut
 from .orchestrateur import Orchestrateur
+from .presentiel import itineraires, ordonner, point_connu, point_dossier
 from .revue import VALIDABLES, ouvrir
 
 PAGE = Path(__file__).resolve().parent / "interface.html"
@@ -50,7 +54,8 @@ class Application:
 
     def etat(self) -> dict:
         store, cfg = self.ctx.store, self.ctx.config
-        compte = Counter(d.statut.value for d in store.lister())
+        dossiers = store.lister()
+        compte = Counter(d.statut.value for d in dossiers)
         taux, n = taux_validation(store, cfg.autonomie.fenetre)
         return {
             "statuts": dict(sorted(compte.items())),
@@ -61,6 +66,75 @@ class Application:
             "cycle": self.cycle,
             "consignes": store.parametre("consignes_redaction", "") or "",
             "file": self._file(),
+            "candidatures": self._candidatures(dossiers),
+            "tournee": self._tournee(dossiers),
+        }
+
+    # ------------------------------------------------------- mes candidatures
+
+    def _candidatures(self, dossiers: list[Dossier]) -> list[dict]:
+        """Tout ce qui a été validé ou envoyé, et ce que l'humain a rejeté."""
+        jours = self.ctx.config.suivi.relances_jours
+        lignes = []
+        for d in dossiers:
+            rejete = d.statut == Statut.abandonnee and d.motif.startswith("rejet humain")
+            if not (a_exporter(d) or rejete):
+                continue
+            etat = _etat(d)
+            relance = None
+            numero = len(d.suivi.relances) + 1
+            if d.statut in (Statut.envoyee, Statut.relancee) and d.suivi.reponse == "aucune" and d.envoi.horodatage and numero <= len(jours):
+                relance = d.envoi.horodatage + timedelta(days=jours[numero - 1])
+            p = d.presentiel
+            lignes.append({
+                "id": d.id, "entreprise": d.offre.entreprise, "intitule": d.offre.intitule, "lieu": d.offre.lieu, "url": d.offre.url,
+                "statut": d.statut.value, "etat": "Rejetée" if rejete else LIBELLES_STATUT.get(etat, str(etat)),
+                "envoyee_le": d.envoi.horodatage, "canal": d.envoi.canal, "destinataire": d.envoi.destinataire,
+                "relances": len(d.suivi.relances), "prochaine_relance": relance,
+                "reponse": d.suivi.reponse, "entretien_le": d.suivi.entretien_le,
+                "motif": re.sub(r"^rejet humain \([^)]*\)\s*:?\s*", "", d.motif) if rejete else "",
+                "sur_place": {"depose_le": p.depose_le} if p and p.conseille else None,
+                "repondable": d.statut in (Statut.envoyee, Statut.relancee) and d.suivi.reponse == "aucune",
+                "date": d.envoi.horodatage or d.offre.date_collecte,
+            })
+        lignes.sort(key=lambda x: x["date"], reverse=True)
+        return lignes
+
+    # ------------------------------------------------------------- tournée
+
+    def _domicile(self) -> str:
+        cfg = self.ctx.config.presentiel
+        if cfg.domicile:
+            return cfg.domicile
+        try:
+            return self.ctx.profil().identite.ville
+        except RuntimeError:
+            return ""
+
+    def _tournee(self, dossiers: list[Dossier]) -> dict:
+        """Candidatures à apporter en main propre, dans l'ordre d'une tournée."""
+        prets, a_valider = [], 0
+        for d in dossiers:
+            p = d.presentiel
+            if not (p and p.conseille) or p.depose_le:
+                continue
+            if a_exporter(d):
+                prets.append(d)
+            elif d.statut == Statut.en_attente_humain:
+                a_valider += 1  # pas encore validée : rien à imprimer
+        domicile = self._domicile()
+        depart = point_connu(self.ctx.store, domicile) if domicile else None
+        arrets = ordonner(depart, [(d, point_dossier(self.ctx.store, d)) for d in prets])
+        return {
+            "domicile": domicile,
+            "a_valider": a_valider,
+            "itineraires": itineraires(domicile, [d.presentiel.adresse or d.offre.lieu for d in arrets]),
+            "arrets": [{
+                "id": d.id, "entreprise": d.offre.entreprise, "intitule": d.offre.intitule, "lieu": d.offre.lieu,
+                "adresse": d.presentiel.adresse or d.offre.lieu, "distance_km": d.presentiel.distance_km,
+                "raison": d.presentiel.raison, "lettre": d.documents.texte_lettre,
+                "deja_envoyee": d.envoi.canal == "email" and d.statut != Statut.validee,
+            } for d in arrets],
         }
 
     def _file(self) -> list[dict]:
@@ -83,7 +157,7 @@ class Application:
         o, doc = d.offre, d.documents
         return {
             "id": d.id, "entreprise": o.entreprise, "intitule": o.intitule, "lieu": o.lieu, "url": o.url,
-            "type": o.type, "etape": d.etape_attente, "motif": d.motif,
+            "source": o.source, "type": o.type, "etape": d.etape_attente, "motif": d.motif,
             "modifiable": bool(doc.version) and d.etape_attente in ("critique", "envoi"),
             "score": d.score.valeur, "confiance": d.score.confiance, "justification": d.score.justification,
             "critique": {"note": d.critique.note, "iteration": d.critique.iteration,
@@ -123,6 +197,8 @@ class Application:
         dossier = self.ctx.store.get(str(donnees.get("dossier", "")))
         if dossier is None:
             raise Refus("Dossier inconnu.")
+        if nom in ("sur_place", "reponse"):
+            return self._suivre(dossier, nom, donnees)
         if nom not in self._actions(dossier):
             raise Refus("Action plus possible pour ce dossier : la page va se rafraîchir.")
         try:
@@ -152,6 +228,26 @@ class Application:
         except ValueError as e:  # correction refusée (placeholder, information hors fiche…)
             raise Refus(str(e)) from e
         raise Refus(f"Action inconnue : {nom}")
+
+    def _suivre(self, dossier: Dossier, nom: str, donnees: dict) -> str:
+        """Actions des onglets « Mes candidatures » et « Tournée »."""
+        try:
+            if nom == "sur_place":
+                self.orch.deposer_sur_place(dossier.id)
+                return f"{dossier.offre.entreprise} : dépôt en main propre enregistré."
+            categorie = donnees.get("categorie")
+            if categorie not in ("entretien", "refus"):
+                raise Refus("Réponse inconnue.")
+            if dossier.statut not in (Statut.envoyee, Statut.relancee) or dossier.suivi.reponse != "aucune":
+                raise Refus("Réponse déjà enregistrée : la page va se rafraîchir.")
+            if categorie == "refus":
+                self.orch.indiquer_reponse(dossier.id, "refus")
+                return f"Refus de {dossier.offre.entreprise} enregistré : plus de relance."
+            # Un entretien prépare une fiche (appel au LLM) : en arrière-plan, comme un cycle.
+            self._lancer(lambda orch: orch.indiquer_reponse(dossier.id, "entretien") or Counter(entretien=1))
+            return f"Entretien chez {dossier.offre.entreprise} : la fiche de préparation se rédige, elle arrivera dans « À traiter »."
+        except (ValueError, RuntimeError) as e:
+            raise Refus(str(e)) from e
 
     def _ecrire_corrections(self, dossier: Dossier, donnees: dict) -> bool:
         """Écrit les textes corrigés là où `valider --modifie` les relit."""

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import re
+from urllib.parse import quote
 
 from .config import ParamsPresentiel
 from .modeles import Dossier, Presentiel
@@ -33,7 +34,7 @@ def geocoder(http: Http, store, texte: str) -> Point | None:
     texte = " ".join(texte.split())
     if not texte:
         return None
-    cle = f"geo:{texte.lower()}"
+    cle = _cle(texte)
     connu = store.parametre(cle) if store is not None else None
     if connu is not None:
         return tuple(connu) if connu else None
@@ -53,6 +54,50 @@ def geocoder(http: Http, store, texte: str) -> Point | None:
     if store is not None:
         store.definir_parametre(cle, list(point) if point else [])
     return point
+
+
+def _cle(texte: str) -> str:
+    return f"geo:{' '.join(texte.split()).lower()}"
+
+
+def point_connu(store, texte: str) -> Point | None:
+    """Coordonnées déjà en cache, sans appel réseau (pour l'affichage)."""
+    connu = store.parametre(_cle(texte)) if texte and texte.strip() else None
+    return tuple(connu) if connu else None
+
+
+def point_dossier(store, dossier: Dossier) -> Point | None:
+    o = dossier.offre
+    if o.latitude is not None and o.longitude is not None:
+        return (o.latitude, o.longitude)
+    return point_connu(store, o.adresse or o.lieu)
+
+
+def ordonner(depart: Point | None, arrets: list[tuple[object, Point | None]]) -> list:
+    """Tournée au plus proche voisin depuis le domicile ; les arrêts sans
+    coordonnées viennent à la fin, dans leur ordre d'origine."""
+    situes = [(a, p) for a, p in arrets if p is not None]
+    ordre, ici = [], depart
+    while situes:
+        i = min(range(len(situes)), key=lambda k: distance_km(ici, situes[k][1])) if ici else 0
+        arret, ici = situes.pop(i)
+        ordre.append(arret)
+    return ordre + [a for a, p in arrets if p is None]
+
+
+ARRETS_PAR_ITINERAIRE = 9  # Google Maps : 10 points au plus, départ compris
+
+
+def itineraires(depart: str, adresses: list[str]) -> list[str]:
+    """Liens d'itinéraire (départ du domicile), découpés en tronçons ;
+    chaque tronçon repart du dernier arrêt du précédent."""
+    liens, origine = [], depart
+    for i in range(0, len(adresses), ARRETS_PAR_ITINERAIRE):
+        troncon = adresses[i:i + ARRETS_PAR_ITINERAIRE]
+        points = ([origine] if origine else []) + troncon
+        liens.append("https://www.google.com/maps/dir/" + "/".join(quote(a, safe="") for a in points) + "/")
+        origine = troncon[-1]
+    return liens
 
 
 def effectif_min(dossier: Dossier) -> int | None:
@@ -88,4 +133,6 @@ def evaluer(dossier: Dossier, domicile: Point | None, entreprise: Point | None, 
 def texte_excel(p: Presentiel | None) -> str:
     if p is None or not p.conseille:
         return ""
+    if p.depose_le:
+        return f"Fait : déposée le {p.depose_le:%d/%m/%Y}" + (f" — {p.adresse}" if p.adresse else "")
     return f"Oui : {p.raison}" + (f" — {p.adresse}" if p.adresse else "")

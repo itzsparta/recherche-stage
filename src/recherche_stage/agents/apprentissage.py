@@ -23,6 +23,7 @@ from .scoring import score_critere
 JOURS_SILENCE = 30
 ENVOYEES = (Statut.envoyee, Statut.relancee, Statut.entretien, Statut.refus, Statut.acceptee)
 FORMATS = ("", "+mail_seul")
+PREFIXE_MOTIF = "motif : "  # décision « rejete » : motif donné par l'humain
 
 
 def resultat(dossier: Dossier, maintenant) -> str | None:
@@ -187,6 +188,15 @@ class AgentApprentissage(Agent):
                     compte[ligne.strip()] += 1
         return compte.most_common(10)
 
+    def motifs_rejet(self) -> list[tuple[str, int]]:
+        """Pourquoi l'humain écarte des candidatures : à lire pour régler la
+        zone, les secteurs ou la taille d'entreprise visés."""
+        compte = Counter()
+        for decision in self.ctx.store.decisions_humaines():
+            if decision["decision"].endswith("rejete") and (decision["diff"] or "").startswith(PREFIXE_MOTIF):
+                compte[decision["diff"][len(PREFIXE_MOTIF):].strip().lower()] += 1
+        return compte.most_common(10)
+
     def memoire_entreprises(self) -> dict[str, float]:
         delais = {}
         for ligne in self.ctx.store.cx.execute("SELECT entreprise, donnees FROM memoire_entreprises"):
@@ -243,6 +253,9 @@ class AgentApprentissage(Agent):
             "",
             "## Corrections humaines les plus fréquentes",
             *([f"- {c} ({n}×)" for c, n in self.corrections_frequentes()] or ["- aucune"]),
+            "",
+            "## Motifs de rejet",
+            *([f"- {m} ({n}×)" for m, n in self.motifs_rejet()] or ["- aucun"]),
             "",
             "## Délais de réponse médians (jours)",
             *([f"- {e} : {d}" for e, d in self.memoire_entreprises().items()] or ["- aucun"]),

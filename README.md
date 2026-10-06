@@ -126,6 +126,10 @@ rs cycle                                  # veille → scoring → enquête → 
 rs interface                              # tout dans le navigateur (sous Windows : double-clic sur interface.bat) :
                                           # lancer un cycle, relire et corriger mail et lettre, valider, rejeter,
                                           # dépôts à la main. Serveur local (127.0.0.1) : rien ne quitte la machine
+                                          # Onglets : « À traiter » (avec la raison du score) ; « Mes candidatures »
+                                          # (statut, relance prévue, réponse entretien/refus à saisir) ;
+                                          # « Sur place » (tournée ordonnée, itinéraire, impression des lettres,
+                                          # « Déposée ✓ », qui vaut envoi). Motifs de rejet repris dans `rs bilan`
 rs revue                                  # la même chose dans le terminal, une touche par élément
 rs consignes "Parcours académique d'abord"  # préférences de rédaction pour toutes les lettres
                                           # (dans l'interface : « Mes préférences de rédaction » ; et sur chaque
