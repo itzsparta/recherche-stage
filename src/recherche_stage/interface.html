@@ -128,6 +128,76 @@
   .aide h3 { margin: 0 0 8px; font-size: 15px; }
   .aide dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
   kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--bord); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; background: var(--champ); }
+  /* ------------------------------------------------------------ agents */
+  .pipeline { position: relative; display: flex; padding: 6px 0 0; }
+  .noeud { flex: 1 1 0; min-width: 0; position: relative; text-align: center; cursor: pointer; padding: 0 2px;
+           animation: apparition .45s ease-out both; animation-delay: calc(var(--i) * 70ms); }
+  .noeud .rond { position: relative; z-index: 1; width: 44px; height: 44px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center;
+                 background: var(--champ); border: 2px solid var(--bord); color: var(--doux); font-weight: 700; font-size: 15px;
+                 transition: background .3s, border-color .3s, color .3s; }
+  .noeud .rond svg { width: 20px; height: 20px; }
+  .noeud .nom { display: block; margin-top: 6px; font-size: 12.5px; font-weight: 600; }
+  .noeud .info { display: block; font-size: 11.5px; color: var(--doux); min-height: 2.6em; overflow: hidden; text-overflow: ellipsis; }
+  .noeud + .noeud::before { content: ""; position: absolute; top: 21px; right: 50%; width: 100%; height: 2px; background: var(--bord); }
+  .noeud.fait .rond { border-color: var(--ok); color: var(--ok); }
+  .noeud.fait + .noeud::before { background: var(--ok); }
+  .noeud.erreur .rond { border-color: var(--non); color: var(--non); }
+  .noeud.actif .rond { background: var(--accent); border-color: var(--accent); color: var(--accent-texte); animation: pouls 1.4s ease-out infinite; }
+  .noeud.actif .rond::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid transparent;
+                              border-top-color: var(--accent); border-right-color: var(--accent); animation: tourne 1s linear infinite; }
+  .noeud.actif .info { color: var(--texte); }
+  .noeud.actif:not(:first-child)::before { background: repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 12px);
+                                           background-size: 24px 2px; animation: flux .7s linear infinite; }
+  .noeud.actif:not(:first-child)::after { content: ""; position: absolute; z-index: 2; top: 17px; width: 10px; height: 10px; margin-left: -5px;
+                                          border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: voyage 1.3s ease-in-out infinite; }
+  .noeud.repos .rond { border-style: dashed; }
+  .noeud:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .retour { position: relative; margin: 2px 5.6% 0 16.7%; height: 18px; border: 2px dashed var(--bord); border-top: 0; border-radius: 0 0 14px 14px; }
+  .retour span { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); background: var(--carte); padding: 0 8px;
+                 font-size: 11.5px; color: var(--doux); white-space: nowrap; }
+  .retour.actif { border-color: var(--accent); animation: clignote 1.2s ease-in-out infinite; }
+  .legende-pipeline { margin-top: 18px; font-size: 13px; }
+  @keyframes pouls { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+  @keyframes tourne { to { transform: rotate(360deg); } }
+  @keyframes flux { to { background-position: 24px 0; } }
+  @keyframes voyage { 0% { left: -50%; opacity: 0; } 15%, 85% { opacity: 1; } 100% { left: 50%; opacity: 0; } }
+  @keyframes voyage-v { 0% { top: -100%; opacity: 0; } 15%, 85% { opacity: 1; } 100% { top: 17px; opacity: 0; } }
+  @keyframes apparition { from { opacity: 0; transform: translateY(8px); } }
+  @keyframes clignote { 50% { opacity: .45; } }
+  @media (max-width: 680px) {
+    .pipeline { flex-direction: column; gap: 6px; }
+    .noeud { display: grid; grid-template-columns: 44px 1fr; column-gap: 12px; text-align: left; align-items: center; padding: 4px 0; }
+    .noeud .rond { grid-row: span 2; }
+    .noeud .nom { margin: 0; }
+    .noeud .info { min-height: 0; }
+    .noeud + .noeud::before { top: auto; bottom: calc(100% - 4px); right: auto; left: 21px; width: 2px; height: 14px; }
+    .noeud.actif:not(:first-child)::before { background: repeating-linear-gradient(180deg, var(--accent) 0 4px, transparent 4px 8px); background-size: 2px 16px; animation: flux-v .7s linear infinite; }
+    .noeud.actif:not(:first-child)::after { left: 17px; margin-left: 0; animation-name: voyage-v; }
+    .retour { margin: 8px 0 0; height: auto; border: 0; }
+    .retour span { position: static; transform: none; padding: 0; white-space: normal; }
+  }
+  @keyframes flux-v { to { background-position: 0 16px; } }
+  @media (prefers-reduced-motion: reduce) {
+    .noeud, .noeud.actif .rond, .noeud.actif .rond::after, .noeud.actif::before, .noeud.actif::after, .retour.actif { animation: none !important; }
+  }
+  .grille-agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+  .grille-agents .carte { margin: 0; transition: outline-color .3s; }
+  .grille-agents .carte.encours { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .grille-agents h3 { margin: 0; font-size: 15px; }
+  .grille-agents dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 10px 0 0; font-size: 13px; }
+  .grille-agents dt { color: var(--doux); }
+  .grille-agents dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .erreur-agent { margin: 8px 0 0; font-size: 12.5px; color: var(--non); overflow-wrap: anywhere; }
+  .pastille { font-size: 12px; border-radius: 99px; padding: 2px 9px; white-space: nowrap; border: 1px solid currentColor; }
+  .pastille.ok { color: var(--ok); } .pastille.non { color: var(--non); } .pastille.avert { color: var(--avert); } .pastille.doux { color: var(--doux); }
+  .barres { display: grid; grid-template-columns: minmax(0, max-content) 1fr auto; gap: 6px 10px; align-items: center; font-size: 13.5px; margin: 6px 0 0; }
+  .barres .jauge { height: 8px; border-radius: 4px; background: var(--champ); border: 1px solid var(--bord); overflow: hidden; min-width: 60px; }
+  .barres .jauge i { display: block; height: 100%; background: var(--accent); border-radius: 4px; transform-origin: left; animation: remplir .6s ease-out both; }
+  .barres .n { color: var(--doux); font-variant-numeric: tabular-nums; }
+  @keyframes remplir { from { transform: scaleX(0); } }
+  .deux-colonnes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .deux-colonnes .panneau h3 { margin: 0 0 6px; font-size: 14.5px; }
+  .deux-colonnes ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; }
   #impression { display: none; }
   @media print {
     body { background: #fff; color: #000; }
@@ -183,6 +253,7 @@
     <button role="tab" id="onglet-file" data-vue="file">À traiter</button>
     <button role="tab" id="onglet-candidatures" data-vue="candidatures">Mes candidatures</button>
     <button role="tab" id="onglet-tournee" data-vue="tournee">Sur place</button>
+    <button role="tab" id="onglet-agents" data-vue="agents">Agents</button>
   </nav>
   <section id="vue-file" role="tabpanel" aria-labelledby="onglet-file">
     <div class="outils">
@@ -214,6 +285,21 @@
     <div id="candidatures"></div>
   </section>
   <section id="vue-tournee" role="tabpanel" aria-labelledby="onglet-tournee" hidden><div id="tournee"></div></section>
+  <section id="vue-agents" role="tabpanel" aria-labelledby="onglet-agents" hidden>
+    <div class="panneau">
+      <div class="pipeline" id="pipeline" aria-label="Les agents dans l'ordre du pipeline"></div>
+      <div class="retour" id="retour"><span>l'Apprentissage renvoie ses leçons à la Veille, au Scoring et au Critique</span></div>
+      <p class="sous legende-pipeline" id="legende-pipeline" aria-live="polite"></p>
+    </div>
+    <h2 id="titre-propositions">Propositions de l'Apprentissage</h2>
+    <div id="propositions"></div>
+    <h2>Sources de la Veille</h2>
+    <div id="sources"></div>
+    <h2>Bilan</h2>
+    <div id="bilan"></div>
+    <h2>Les agents en détail</h2>
+    <div class="grille-agents" id="grille-agents"></div>
+  </section>
 </main>
 <div id="impression"></div>
 <div class="aide" id="aide" hidden role="dialog" aria-label="Raccourcis clavier">
@@ -225,7 +311,7 @@
     <dt><kbd>r</kbd></dt><dd>rejeter</dd>
     <dt><kbd>d</kbd></dt><dd>c'est déposé</dd>
     <dt><kbd>o</kbd></dt><dd>ouvrir le dossier</dd>
-    <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dt><dd>onglets</dd>
+    <dt><kbd>1</kbd> … <kbd>4</kbd></dt><dd>onglets</dd>
     <dt><kbd>Échap</kbd></dt><dd>fermer un volet, cette aide</dd>
   </dl>
 </div>
@@ -270,6 +356,7 @@ async function rafraichir() {
   afficherFile(etat.file);
   afficherCandidatures(etat.candidatures);
   afficherTournee(etat.tournee);
+  afficherActivite(etat.cycle, etat.agents);
   return etat;
 }
 
@@ -547,13 +634,14 @@ function tiroir(carte, o, envoyer) {
 }
 
 // ---------------------------------------------------------------- onglets
-const VUES = ["file", "candidatures", "tournee"];
+const VUES = ["file", "candidatures", "tournee", "agents"];
 function montrerVue() {
   const vue = VUES.includes(location.hash.slice(1)) ? location.hash.slice(1) : "file";
   for (const v of VUES) {
     document.getElementById("vue-" + v).hidden = v !== vue;
     document.getElementById("onglet-" + v).setAttribute("aria-selected", String(v === vue));
   }
+  if (vue === "agents") chargerAgents(true);
 }
 document.querySelectorAll(".onglets button").forEach(b => b.addEventListener("click", () => {
   history.replaceState(null, "", "#" + b.dataset.vue); montrerVue();
@@ -682,6 +770,215 @@ function imprimerTournee() {
   window.print();
 }
 
+// -------------------------------------------------------------------- agents
+const ICONES = {
+  profil: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  veille: '<path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/>',
+  scoring: '<path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/>',
+  enquete: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  redaction: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  critique: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  envoi: '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
+  suivi: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/>',
+  apprentissage: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
+};
+const LIBELLES_AGENTS = { profil: "Profil", veille: "Veille", scoring: "Scoring", enquete: "Enquête", redaction: "Rédaction",
+  critique: "Critique", envoi: "Envoi", suivi: "Suivi", apprentissage: "Apprentissage" };
+var donneesAgents = null, dernierCycle = null, chargementAgents = 0, signaturesAgents = {};
+// Redessine une partie seulement si ses données ont changé (sinon les animations repartiraient).
+function siChange(cle, donnees, dessiner) {
+  const s = JSON.stringify([donnees, cycleEnCours]);
+  if (signaturesAgents[cle] !== s) { signaturesAgents[cle] = s; dessiner(); }
+}
+
+function icone(nom) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2"); svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.innerHTML = ICONES[nom];
+  return svg;
+}
+
+function ilYa(v) {
+  if (!v) return "";
+  const minutes = Math.round((Date.now() - jour(v)) / 60000);
+  if (minutes < 2) return "à l'instant";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  if (minutes < 48 * 60) return `il y a ${Math.round(minutes / 60)} h`;
+  return `il y a ${Math.round(minutes / 1440)} j`;
+}
+
+async function chargerAgents(force = false) {
+  if (document.getElementById("vue-agents").hidden && !force) return;
+  if (!force && Date.now() - chargementAgents < 5000) return;
+  chargementAgents = Date.now();
+  try { donneesAgents = await (await fetch("/api/agents")).json(); }
+  catch { return; }
+  dessinerAgents();
+  if (dernierCycle) afficherActivite(dernierCycle.cycle, dernierCycle.resume);
+}
+
+function afficherActivite(cycle, resume) {
+  dernierCycle = { cycle, resume };
+  const attention = resume.propositions + resume.sources_coupees;
+  const onglet = document.getElementById("onglet-agents");
+  onglet.textContent = attention ? `Agents (${attention})` : "Agents";
+  onglet.title = attention ? [resume.propositions ? `${resume.propositions} proposition(s) à décider` : "",
+    resume.sources_coupees ? `${resume.sources_coupees} source(s) coupée(s)` : ""].filter(Boolean).join(", ") : "";
+
+  const pipeline = document.getElementById("pipeline");
+  if (!pipeline.children.length)
+    pipeline.append(...Object.keys(LIBELLES_AGENTS).map((nom, i) => {
+      const n = el("div", { class: "noeud", style: `--i:${i}`, tabindex: "0", role: "button", "data-agent": nom,
+        "aria-label": `${LIBELLES_AGENTS[nom]} : voir le détail`, onclick: () => montrerAgent(nom),
+        onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); montrerAgent(nom); } } },
+        el("span", { class: "rond" }, icone(nom)), el("span", { class: "nom" }, LIBELLES_AGENTS[nom]), el("span", { class: "info" }));
+      return n;
+    }));
+  const parNom = Object.fromEntries((donneesAgents?.agents || []).map(a => [a.nom, a]));
+  const bilanCycle = cycle.bilan_agents || {};
+  for (const n of pipeline.children) {
+    const nom = n.dataset.agent, a = parNom[nom], b = bilanCycle[nom];
+    const actif = cycle.en_cours && cycle.agent === nom;
+    n.classList.toggle("actif", actif);
+    n.classList.toggle("fait", !actif && !!b && b.ok > 0);
+    n.classList.toggle("erreur", !actif && !!b && b.erreurs > 0 && !b.ok);
+    n.classList.toggle("repos", nom === "profil");
+    let info;
+    if (actif) info = cycle.sujet || "au travail…";
+    else if (b) info = [b.ok ? `✓ ${b.ok}` : "", b.erreurs ? `✗ ${b.erreurs}` : ""].filter(Boolean).join(" · ");
+    else if (a && a.en_attente) info = `${a.en_attente} en attente`;
+    else if (a) info = a.dernier ? ilYa(a.dernier) : "pas encore lancé";
+    else info = "";
+    n.querySelector(".info").textContent = info;
+    n.title = actif && cycle.sujet ? `${LIBELLES_AGENTS[nom]} : ${cycle.sujet}` : "";
+    document.querySelector(`#grille-agents [data-agent="${nom}"]`)?.classList.toggle("encours", actif);
+  }
+  document.getElementById("retour").classList.toggle("actif", cycle.en_cours && cycle.agent === "apprentissage");
+  const legende = document.getElementById("legende-pipeline");
+  if (cycle.en_cours && cycle.agent) legende.textContent = `${LIBELLES_AGENTS[cycle.agent] || cycle.agent} au travail${cycle.sujet ? " : " + cycle.sujet : ""}…`;
+  else if (cycle.en_cours) legende.textContent = "Préparation…";
+  else if (Object.keys(bilanCycle).length) legende.textContent = "Dernier passage : en vert les agents qui ont travaillé (✓ réussis, ✗ en erreur). Clique un agent pour son détail.";
+  else legende.textContent = "Lance un cycle pour voir les agents s'animer. Clique un agent pour son détail.";
+  if (cycle.en_cours) chargerAgents();
+}
+
+function montrerAgent(nom) {
+  const carte = document.querySelector(`#grille-agents [data-agent="${nom}"]`);
+  if (!carte) return;
+  carte.scrollIntoView({ behavior: "smooth", block: "center" });
+  carte.classList.add("active"); setTimeout(() => carte.classList.remove("active"), 1600);
+}
+
+function dessinerAgents() {
+  const d = donneesAgents;
+  if (!d) return;
+  siChange("propositions", d.propositions, () => dessinerPropositions(d));
+  siChange("sources", d.sources, () => dessinerSources(d));
+  siChange("bilan", d.bilan, () => dessinerBilan(d));
+  siChange("agents", d.agents, () => dessinerFiches(d));
+}
+
+function dessinerPropositions(d) {
+  const props = document.getElementById("propositions");
+  document.getElementById("titre-propositions").textContent = `Propositions de l'Apprentissage${d.propositions.length ? ` (${d.propositions.length})` : ""}`;
+  props.replaceChildren(...(d.propositions.length ? d.propositions.map(p => {
+    const carte = el("article", { class: "carte" },
+      el("div", { class: "entete" }, el("h3", {}, p.titre), el("div", { class: "badges" }, el("span", { class: "badge" }, `proposée le ${dateCourte(p.cree)}`))),
+      p.details.length ? el("ul", { class: "remarques" }, p.details.map(x => el("li", {}, x))) : "");
+    const decider = async decision => {
+      carte.querySelectorAll("button").forEach(b => b.disabled = true);
+      try { toast(await poster("/api/action", { action: "proposition", id: p.id, decision })); }
+      catch (err) { toast(err.message, true); }
+      await rafraichir(); chargerAgents(true);
+    };
+    carte.append(el("div", { class: "actions" },
+      el("button", { class: "principal", disabled: cycleEnCours || null, onclick: () => decider("appliquer") }, "Appliquer"),
+      el("button", { disabled: cycleEnCours || null, onclick: () => decider("refuser") }, "Refuser")));
+    return carte;
+  }) : [el("div", { class: "vide" }, "Aucune proposition en attente. L'Apprentissage en fait au bilan hebdomadaire, quand il a assez de résultats (réponses, rejets, corrections).")]));
+
+}
+
+function dessinerSources(d) {
+  const ETATS = {
+    ok: ["OK", "ok"], jamais: ["pas encore interrogée", "doux"], fragile: [null, "avert"],
+    coupee: [null, "non"], a_retenter: ["retentée au prochain cycle", "avert"],
+  };
+  const sources = document.getElementById("sources");
+  if (!d.sources.length) sources.replaceChildren(el("div", { class: "vide" }, "Aucune source configurée."));
+  else sources.replaceChildren(el("table", { class: "liste" },
+    el("thead", {}, el("tr", {}, ["Source", "État", "Collectes", "Dernière collecte", "Part de la collecte", ""].map(x => el("th", {}, x)))),
+    el("tbody", {}, d.sources.map(s => {
+      const [texte, classe] = ETATS[s.etat];
+      const libelle = s.etat === "fragile" ? `${s.echecs} échec(s) d'affilée` :
+        s.etat === "coupee" ? `coupée jusqu'au ${jour(s.reprise).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : texte;
+      const action = el("td", {});
+      if (s.etat === "coupee") action.append(el("button", { disabled: cycleEnCours || null, onclick: async ev => {
+        ev.target.disabled = true;
+        try { toast(await poster("/api/action", { action: "source", nom: s.nom })); } catch (err) { toast(err.message, true); }
+        await rafraichir(); chargerAgents(true);
+      } }, "Réessayer au prochain cycle"));
+      return el("tr", {},
+        el("td", {}, el("b", {}, s.nom), s.erreur ? el("div", { class: "erreur-agent" }, s.erreur) : ""),
+        el("td", { "data-titre": "État" }, el("span", { class: "pastille " + classe }, libelle)),
+        el("td", { "data-titre": "Collectes" }, String(s.collectes)),
+        el("td", { class: "date", "data-titre": "Dernière collecte" }, s.derniere_collecte ? ilYa(s.derniere_collecte) : "—"),
+        el("td", { "data-titre": "Part de la collecte" }, s.part != null ? `${Math.round(s.part * 100)} %`
+          : d.sources.some(x => x.part != null) ? "—" : "à parts égales"),
+        action);
+    }))));
+
+}
+
+function dessinerBilan(d) {
+  const b = d.bilan;
+  const barres = (lignes, valeur, texte, n) => {
+    const max = Math.max(...lignes.map(valeur), 1e-9);
+    return el("div", { class: "barres" }, lignes.flatMap(l => [
+      el("span", {}, texte(l)), el("span", { class: "jauge", role: "img", "aria-label": n(l) }, el("i", { style: `width:${Math.max(2, 100 * valeur(l) / max)}%` })),
+      el("span", { class: "n" }, n(l))]));
+  };
+  const panneau = (titre, contenu, vide) => el("div", { class: "panneau" }, el("h3", {}, titre),
+    contenu ? contenu : el("p", { class: "sous" }, vide));
+  document.getElementById("bilan").replaceChildren(
+    el("div", { class: "chiffres", style: "margin-top:0" },
+      [[b.abouties, "candidatures avec un résultat"], [b.entretiens, "entretiens"], [b.refus, "refus"], [b.silences, "sans réponse après 30 j"]]
+        .map(([v, l]) => el("div", { class: "chiffre" }, el("b", {}, v), el("span", {}, l)))),
+    el("div", { class: "deux-colonnes" },
+      panneau("Pourquoi tu écartes des pistes", b.motifs_rejet.length ? barres(b.motifs_rejet, l => l.n, l => l.texte, l => `${l.n}×`) : null,
+        "Aucun motif encore : donne-en un quand tu rejettes une candidature, il apparaîtra ici."),
+      panneau("Lettres : quelle ouverture marche le mieux", b.variantes.length ? barres(b.variantes, l => l.p_meilleur, l => l.nom,
+        l => `${l.entretiens}/${l.total} · ${Math.round(l.p_meilleur * 100)} %`) : null,
+        "Pas encore de résultat : il faut des réponses aux candidatures envoyées."),
+      panneau("Entretiens par source", b.par_source.length ? el("ul", {}, b.par_source.map(s => el("li", {}, `${s.nom} : ${s.taux}`))) : null, "Pas encore de résultat."),
+      panneau("Tes corrections les plus fréquentes", b.corrections.length ? el("ul", {}, b.corrections.map(c => el("li", {}, `${c.texte} (${c.n}×)`))) : null,
+        "Aucune : tu as validé les textes tels quels."),
+      b.delais.length ? panneau("Délais de réponse (médiane)", el("ul", {}, b.delais.map(x => el("li", {}, `${x.entreprise} : ${x.jours} j`)))) : ""),
+    el("div", { class: "actions" },
+      el("button", { disabled: cycleEnCours || null, onclick: async ev => {
+        ev.target.disabled = true;
+        try { toast(await poster("/api/action", { action: "bilan" })); } catch (err) { toast(err.message, true); }
+        await rafraichir(); chargerAgents(true);
+      } }, "Refaire le bilan maintenant"),
+      el("span", { class: "sous" }, b.dernier ? `Dernier bilan ${ilYa(b.dernier)}. Il est refait chaque semaine pendant un cycle.` : "Le bilan est fait chaque semaine pendant un cycle.")));
+
+}
+
+function dessinerFiches(d) {
+  document.getElementById("grille-agents").replaceChildren(...d.agents.map(a => el("article", { class: "carte", "data-agent": a.nom },
+    el("div", { class: "entete" }, el("h3", {}, a.libelle),
+      a.erreurs ? el("span", { class: "pastille non" }, `${a.erreurs} erreur(s)`) : a.actions ? el("span", { class: "pastille ok" }, "actif") : el("span", { class: "pastille doux" }, "au repos")),
+    el("div", { class: "sous" }, a.role),
+    el("dl", {},
+      el("dt", {}, "Dernier passage"), el("dd", {}, a.dernier ? `${ilYa(a.dernier)} (${dateCourte(a.dernier)})` : "jamais"),
+      el("dt", {}, "Actions (7 j)"), el("dd", {}, String(a.actions)),
+      el("dt", {}, "Appels LLM (semaine)"), el("dd", {}, a.appels_llm ? `${a.appels_llm} · ${Math.round(a.tokens / 1000)} k tokens` : "0"),
+      a.en_attente != null ? [el("dt", {}, "En attente"), el("dd", {}, `${a.en_attente} dossier(s)`)] : ""),
+    a.derniere_erreur ? el("p", { class: "erreur-agent" }, "Dernière erreur : " + a.derniere_erreur) : "")));
+}
+
 // ------------------------------------------------------- raccourcis clavier
 function cartesVisibles() { return [...document.querySelectorAll("#file > .carte:not([hidden])")]; }
 function activer(carte) {
@@ -704,7 +1001,7 @@ document.addEventListener("keydown", ev => {
   }
   if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.target.closest("input, textarea, select, [contenteditable]")) return;
   if (ev.key === "?") { aide.hidden = !aide.hidden; return; }
-  if (["1", "2", "3"].includes(ev.key)) { history.replaceState(null, "", "#" + VUES[ev.key - 1]); montrerVue(); return; }
+  if (["1", "2", "3", "4"].includes(ev.key)) { history.replaceState(null, "", "#" + VUES[ev.key - 1]); montrerVue(); return; }
   if (document.getElementById("vue-file").hidden) return;
   const cartes = cartesVisibles();
   const active = cartes.find(c => c.classList.contains("active"));
@@ -796,6 +1093,7 @@ async function suivreCycle() {
     notifier(`${noms[etat.cycle.nature] || "Travail"} terminé`, etat.cycle.erreur ? "Interrompu : voir le journal"
       : `${etat.file.length} élément(s) à traiter.`);
     if (etat.cycle.nature === "cycle") verifier();
+    chargerAgents();
   }
 }
 

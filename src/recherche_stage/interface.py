@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import parse_qs, quote_plus, urlparse
 
-from . import reglages, verifications
+from . import reglages, verifications, vue_agents
 from .agents.base import Contexte
 from .autonomie import envoi_automatique_debloque, taux_validation
 from .excel import LIBELLES_STATUT, _etat, a_exporter
@@ -52,7 +52,7 @@ class Application:
         self.ouvrir = ouvrir
         self.arriere_plan = arriere_plan
         self.jeton = secrets.token_urlsafe(24)
-        self.cycle = {"en_cours": False, "nature": "cycle", "lignes": [], "rapport": None, "erreur": None}
+        self.cycle = self._etat_travail(False, "cycle")
 
     # ------------------------------------------------------------------ état
 
@@ -73,7 +73,11 @@ class Application:
             "candidatures": self._candidatures(dossiers),
             "tournee": self._tournee(dossiers),
             "reglages": reglages.lire(cfg) if self.chemin_config else None,
+            "agents": vue_agents.resume(self.orch),
         }
+
+    def agents(self) -> dict:
+        return vue_agents.tout(self.orch)
 
     # ------------------------------------------------------- mes candidatures
 
@@ -252,6 +256,19 @@ class Application:
         nom = donnees.get("action")
         if nom == "reglages":
             return self.enregistrer_reglages(donnees.get("valeurs") or {})
+        if nom == "proposition":
+            try:
+                return vue_agents.decider_proposition(self.orch, int(donnees["id"]), donnees.get("decision") == "appliquer")
+            except ValueError as e:
+                raise Refus(str(e)) from e
+        if nom == "source":
+            try:
+                vue_agents.reactiver_source(self.orch, str(donnees.get("nom", "")))
+            except KeyError:
+                raise Refus("Source inconnue.") from None
+            return f"Source « {donnees['nom']} » réactivée : elle sera interrogée au prochain cycle."
+        if nom == "bilan":
+            return vue_agents.refaire_bilan(self.orch)
         if nom == "consignes":
             self.ctx.store.definir_parametre("consignes_redaction", str(donnees.get("texte", "")).strip())
             return "Préférences enregistrées : elles s'appliquent aux prochaines rédactions et réécritures."
@@ -339,12 +356,18 @@ class Application:
 
     def _lancer(self, travail: Callable[[Orchestrateur], Counter], nature: str = "travail") -> None:
         """Travail long (cycle, réécriture, test) hors du fil du serveur, suivi par la page."""
-        self.cycle = {"en_cours": True, "nature": nature, "lignes": [], "rapport": None, "erreur": None}
+        self.cycle = self._etat_travail(True, nature)
         execution = threading.Thread(target=self._travailler, args=(travail,), daemon=True)
         if self.arriere_plan:
             execution.start()
         else:
             execution.run()
+
+    @staticmethod
+    def _etat_travail(en_cours: bool, nature: str) -> dict:
+        # agent : celui qui travaille en ce moment ; bilan_agents : {agent: {ok, erreurs}} de ce travail.
+        return {"en_cours": en_cours, "nature": nature, "lignes": [], "rapport": None, "erreur": None,
+                "agent": None, "sujet": "", "bilan_agents": {}}
 
     def _travailler(self, travail: Callable[[Orchestrateur], Counter]) -> None:
         etat = self.cycle
@@ -352,12 +375,21 @@ class Application:
             # Connexion SQLite propre au fil d'exécution du travail.
             _, orch = self.fabrique() if self.arriere_plan else (self.ctx, self.orch)
             orch.progres = etat["lignes"].append
+
+            def activite(agent: str | None, issue: str = "debut", sujet: str = "") -> None:
+                if issue == "debut":
+                    etat["agent"], etat["sujet"] = agent, sujet
+                elif agent:
+                    compte = etat["bilan_agents"].setdefault(agent, {"ok": 0, "erreurs": 0})
+                    compte["ok" if issue == "ok" else "erreurs"] += 1
+
+            orch.activite = activite
             etat["rapport"] = dict(sorted(travail(orch).items()))
         except Exception as e:  # affiché dans la page plutôt que perdu dans la console
             etat["erreur"] = f"{type(e).__name__} : {e}"
             traceback.print_exc()
         finally:
-            etat["en_cours"] = False
+            etat["agent"], etat["en_cours"] = None, False
 
 
 # ------------------------------------------------------------------ serveur
@@ -395,6 +427,8 @@ def gestionnaire(app: Application, hotes: set[str]):
                 self._repondre(200, page.encode("utf-8"), "text/html; charset=utf-8")
             elif self.path == "/api/etat":
                 self._json(200, app.etat())
+            elif self.path == "/api/agents":
+                self._json(200, app.agents())
             elif self.path.startswith("/lettre.pdf?"):
                 dossier = parse_qs(urlparse(self.path).query).get("dossier", [""])[0]
                 try:

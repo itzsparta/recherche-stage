@@ -38,10 +38,15 @@ def orchestrateur(ctx):
 
 
 def test_pipeline_complet_avec_porte_humaine(orchestrateur, ctx, horloge):
-    etapes = []
+    etapes, activite = [], []
     orchestrateur.progres = etapes.append
+    orchestrateur.activite = lambda agent, issue="debut", sujet="": activite.append((agent, issue))
     rapport = orchestrateur.cycle()
-    assert [e.split(" ")[0] for e in etapes] == ["Collecte", "Scoring", "Enquête", "Rédaction", "Suivi"]
+    assert [e.split(" ")[0] for e in etapes] == ["Collecte", "Scoring", "Enquête", "Rédaction", "Suivi", "Bilan"]
+    # L'interface anime chaque agent au travail, dans l'ordre du pipeline.
+    debuts = [a for a, issue in activite if issue == "debut" and a]
+    assert list(dict.fromkeys(debuts)) == ["veille", "scoring", "enquete", "redaction", "critique", "envoi", "suivi", "apprentissage"]
+    assert activite[-1] == (None, "debut") and ("critique", "ok") in activite
     assert rapport["collectees"] == 1 and rapport["enquetes"] == 1
     assert rapport["critique:renvoyer"] == 1 and rapport["critique:valider"] == 1
     assert rapport["brouillons"] == 1 and rapport["bilan"] == 1

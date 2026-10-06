@@ -172,7 +172,11 @@ class AgentApprentissage(Agent):
                     cle = normaliser(ligne[2:])
                     occurrences[cle].add(decision["dossier_id"])
                     exemples[cle] = ligne[2:].strip()
-        existantes = {r["motif"] for r in self.ctx.store.regles()}
+        # Déjà en place, déjà proposées ou refusées par l'humain : pas reproposées.
+        existantes = {r["motif"] for r in self.ctx.store.regles()} | {
+            p["contenu"]["motif"] for etat in ("proposee", "refusee")
+            for p in self.ctx.store.propositions(etat) if p["mecanisme"] == "nouvelles_regles"
+        }
         regles = []
         for cle, dossiers in occurrences.items():
             motif = re.escape(exemples[cle])
@@ -217,11 +221,19 @@ class AgentApprentissage(Agent):
         calibration = self.calibration_critique()
         regles = self.nouvelles_regles()
 
-        store.proposer("allocation_sources", "Veille", {"allocation_sources": allocation})
+        def proposer(mecanisme: str, cible: str, contenu: dict) -> None:
+            # Une seule proposition en attente par mécanisme : la plus récente, calculée
+            # sur toutes les données, remplace la précédente (sinon leurs effets s'additionneraient).
+            for ancienne in store.propositions():
+                if ancienne["mecanisme"] == mecanisme:
+                    store.marquer_proposition(ancienne["id"], "remplacee")
+            store.proposer(mecanisme, cible, contenu)
+
+        proposer("allocation_sources", "Veille", {"allocation_sources": allocation})
         if recalibrage:
-            store.proposer("recalibrage_scoring", "Scoring", recalibrage)
+            proposer("recalibrage_scoring", "Scoring", recalibrage)
         if calibration and "seuil_validation_critique" in calibration:
-            store.proposer("calibration_critique", "Critique", calibration)
+            proposer("calibration_critique", "Critique", calibration)
         for regle in regles:
             store.proposer("nouvelles_regles", "Critique", regle)
 

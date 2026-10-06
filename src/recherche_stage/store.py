@@ -200,6 +200,27 @@ class Store:
             lignes = self.cx.execute("SELECT * FROM journal ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
         return [dict(ligne) | {"details": json.loads(ligne["details"] or "{}")} for ligne in reversed(lignes)]
 
+    def activite_agents(self, depuis: datetime) -> dict[str, dict]:
+        """Par agent : actions et erreurs depuis `depuis`, et dernier passage (toutes dates)."""
+        activite: dict[str, dict] = {}
+        for ligne in self.cx.execute("SELECT agent, MAX(horodatage) AS dernier FROM journal GROUP BY agent"):
+            activite[ligne["agent"]] = {"dernier": ligne["dernier"], "actions": 0, "erreurs": 0}
+        for ligne in self.cx.execute(
+            "SELECT agent, COUNT(*) AS actions, SUM(action = 'erreur') AS erreurs FROM journal "
+            "WHERE horodatage >= ? GROUP BY agent", (depuis.isoformat(timespec="seconds"),),
+        ):
+            activite[ligne["agent"]].update(actions=ligne["actions"], erreurs=ligne["erreurs"] or 0)
+        return activite
+
+    def dernieres_actions(self, action: str, limite: int = 200) -> list[dict]:
+        """Dernières entrées du journal pour une action donnée, de la plus récente à la plus ancienne."""
+        lignes = self.cx.execute("SELECT * FROM journal WHERE action = ? ORDER BY id DESC LIMIT ?", (action, limite))
+        return [dict(ligne) | {"details": json.loads(ligne["details"] or "{}")} for ligne in lignes]
+
+    def proposition(self, proposition_id: int) -> dict | None:
+        ligne = self.cx.execute("SELECT * FROM propositions WHERE id = ?", (proposition_id,)).fetchone()
+        return dict(ligne) | {"contenu": json.loads(ligne["contenu"])} if ligne else None
+
     # ------------------------------------------------------------------- envois
 
     def reserver_envoi(self, dossier_id: str, nature: str, canal: str) -> bool:
@@ -308,6 +329,13 @@ class Store:
             "INSERT INTO appels_llm(horodatage, agent, modele, tokens_entree, tokens_sortie) VALUES (?, ?, ?, ?, ?)",
             (self._maintenant(), agent, modele, tokens_entree, tokens_sortie),
         )
+
+    def appels_llm_par_agent(self, depuis: datetime) -> dict[str, dict]:
+        lignes = self.cx.execute(
+            "SELECT agent, COUNT(*) AS appels, COALESCE(SUM(tokens_entree + tokens_sortie), 0) AS tokens "
+            "FROM appels_llm WHERE horodatage >= ? GROUP BY agent", (depuis.isoformat(timespec="seconds"),),
+        )
+        return {ligne["agent"]: {"appels": ligne["appels"], "tokens": ligne["tokens"]} for ligne in lignes}
 
     def appels_llm_semaine(self) -> int:
         depuis = debut_semaine(self.horloge()).isoformat(timespec="seconds")

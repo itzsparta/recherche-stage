@@ -57,6 +57,8 @@ class Orchestrateur:
         self.suivi = AgentSuivi(ctx, boite, expediteur)
         self.apprentissage = AgentApprentissage(ctx, rng)
         self.progres: Callable[[str], None] = lambda message: None  # avancement, affiché par la CLI
+        # Agent au travail (« debut »), puis issue (« ok » / « erreur ») : animation de l'interface.
+        self.activite: Callable[[str | None, str, str], None] = lambda agent, issue="debut", sujet="": None
 
     @property
     def store(self):
@@ -71,13 +73,17 @@ class Orchestrateur:
     def _executer(self, agent_nom: str, dossier: Dossier, action: Callable[[], None]) -> bool:
         """Lance une étape en isolant ses erreurs. Après plusieurs échecs, le
         dossier rejoint la file des irrécupérables (statut erreur) et l'humain est prévenu."""
+        self.activite(agent_nom, "debut", dossier.offre.entreprise)
         try:
             action()
             self.store.save(dossier)
+            self.activite(agent_nom, "ok")
             return True
         except BudgetEpuise:
+            self.activite(agent_nom, "erreur")
             raise
         except (ErreurLLM, ErreurReseau, OSError, ValueError, RuntimeError) as e:
+            self.activite(agent_nom, "erreur")
             echecs = sum(1 for h in dossier.historique if h.action.startswith("erreur")) + 1
             self.progres(f"  erreur ({echecs}/{ERREURS_AVANT_FILE}) : {e}")
             dossier.tracer(agent_nom, f"erreur:{e.__class__.__name__}")
@@ -131,6 +137,7 @@ class Orchestrateur:
         except BudgetEpuise as e:
             rapport["budget_epuise"] += 1
             self._escalader(None, "budget", f"{e}. Le pipeline reprendra lundi (ou relever appels_api_max_par_semaine).")
+        self.activite(None)
         self.store.journaliser(self.nom, "cycle", details=dict(rapport))
         self.mettre_a_jour_excel()  # même après un arrêt sur quota : le travail fait y figure
         return rapport
@@ -143,7 +150,9 @@ class Orchestrateur:
 
         if collecter and nouvelles_candidatures:
             self.progres("Collecte des offres et cibles…")
+            self.activite("veille")
             rapport["collectees"] += len(self.veille.executer())
+            self.activite("veille", "ok")
 
         profil, grille = self.ctx.profil(), self.ctx.grille()
         # `filtree` : scoring interrompu par une erreur au cycle précédent, on le reprend.
@@ -195,11 +204,14 @@ class Orchestrateur:
 
         if suivre:
             self.progres("Suivi de la boîte mail…")
+            self.activite("suivi")
             try:
                 resultat = self.suivi.executer()
                 rapport["reponses"] += resultat["reponses"]
                 rapport["relances"] += resultat["relances"]
+                self.activite("suivi", "ok")
             except (ErreurLLM, ErreurReseau) as e:
+                self.activite("suivi", "erreur")
                 # Boîte injoignable : le reste du cycle est acquis, le suivi reprendra au prochain.
                 rapport["suivi_en_echec"] += 1
                 self.store.journaliser("suivi", "erreur", details={"erreur": str(e)})
@@ -277,18 +289,23 @@ class Orchestrateur:
         dernier = self.store.parametre("dernier_bilan")
         if dernier and self.ctx.horloge() - datetime.fromisoformat(dernier) < timedelta(days=7):
             return
+        self.progres("Bilan hebdomadaire de l'Apprentissage…")
+        self.activite("apprentissage")
         self.apprentissage.executer()
         self.appliquer_propositions(auto_seulement=True)
+        self.activite("apprentissage", "ok")
         self.store.definir_parametre("dernier_bilan", self.ctx.horloge().isoformat(timespec="seconds"))
         rapport["bilan"] += 1
 
     # --------------------------------------------- propositions d'apprentissage
 
-    def appliquer_propositions(self, auto_seulement: bool = False) -> list[str]:
+    def appliquer_propositions(self, auto_seulement: bool = False, ids: set[int] | None = None) -> list[str]:
         appliquees = []
         derniere_allocation = None
         for p in self.store.propositions():
             if auto_seulement and p["mecanisme"] not in AUTO_APPLIQUEES:
+                continue
+            if ids is not None and p["id"] not in ids:
                 continue
             c = p["contenu"]
             if p["mecanisme"] == "allocation_sources":

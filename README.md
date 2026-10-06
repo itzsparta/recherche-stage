@@ -135,6 +135,10 @@ rs interface                              # tout dans le navigateur (sous Window
                                           # version précédente, lettre en PDF, filtres, raccourcis clavier (« ? »).
                                           # Panneau « Réglages » : zone, secteurs, rythme, présentiel, Excel,
                                           # écrits dans config.yaml (jamais de clé ni de mot de passe)
+                                          # Onglet « Agents » : pipeline animé pendant un cycle (agent au travail,
+                                          # dossier en cours), activité et appels LLM par agent, sources coupées
+                                          # (« Réessayer »), propositions de l'Apprentissage à appliquer ou refuser
+                                          # (comme `rs bilan --appliquer`, au cas par cas), bilan des résultats
 rs revue                                  # la même chose dans le terminal, une touche par élément
 rs consignes "Parcours académique d'abord"  # préférences de rédaction pour toutes les lettres
                                           # (dans l'interface : « Mes préférences de rédaction » ; et sur chaque
