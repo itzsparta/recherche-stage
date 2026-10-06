@@ -124,6 +124,7 @@ class Orchestrateur:
             rapport["budget_epuise"] += 1
             self._escalader(None, "budget", f"{e}. Le pipeline reprendra lundi (ou relever appels_api_max_par_semaine).")
         self.store.journaliser(self.nom, "cycle", details=dict(rapport))
+        self.mettre_a_jour_excel()  # même après un arrêt sur quota : le travail fait y figure
         return rapport
 
     def _cycle(self, rapport: Counter, collecter: bool, envoyer: bool, suivre: bool) -> None:
@@ -197,6 +198,24 @@ class Orchestrateur:
                 self._escalader(None, "suivi", f"Suivi des réponses impossible : {e}. Vérifier suivi.imap dans config.yaml.")
 
         self._bilan_si_du(rapport)
+
+    def mettre_a_jour_excel(self) -> str:
+        """Reporte les candidatures dans le tableau Excel de l'utilisateur, s'il en a un."""
+        chemin = self.ctx.config.suivi.excel
+        if not chemin:
+            return ""
+        from .excel import ErreurExcel, mettre_a_jour
+
+        try:
+            ajoutees, maj = mettre_a_jour(chemin, self.store.lister(), self.ctx.config.suivi.excel_feuille)
+        except (ErreurExcel, OSError, KeyError) as e:
+            message = f"Tableau Excel non mis à jour : {e}"
+            self.store.journaliser(self.nom, "excel_erreur", details={"erreur": str(e)})
+        else:
+            message = f"Tableau Excel : {ajoutees} ligne(s) ajoutée(s), {maj} mise(s) à jour"
+            self.store.journaliser(self.nom, "excel", details={"ajoutees": ajoutees, "mises_a_jour": maj})
+        self.progres(message)
+        return message
 
     def _rediger_et_critiquer(self, dossier: Dossier, rapport: Counter) -> None:
         """Boucle Rédaction → Critique, bornée par le nombre d'itérations du Critique."""
@@ -318,6 +337,7 @@ class Orchestrateur:
             raise ValueError(f"Étape inconnue : {etape}")
         dossier.tracer("humain", f"validation:{etape}", self.store.memoriser_entrees({"modifie": modifie, "diff": diff}))
         self.store.save(dossier)
+        self.mettre_a_jour_excel()
         return etape
 
     def reprendre_enquetes(self) -> int:
@@ -359,6 +379,7 @@ class Orchestrateur:
         self.store.enregistrer_decision(dossier.id, f"suivi:{categorie}")
         self.store.resoudre_escalades(dossier.id, categorie)
         self.store.save(dossier)
+        self.mettre_a_jour_excel()
 
     def marquer_envoye(self, dossier_id: str, preuve: str) -> None:
         dossier = self._dossier(dossier_id)
@@ -366,6 +387,7 @@ class Orchestrateur:
         dossier.etape_attente = ""
         self.store.resoudre_escalades(dossier.id, "envoyé manuellement")
         self.store.save(dossier)
+        self.mettre_a_jour_excel()
 
     def liberer_envoi(self, dossier_id: str, nature: str = "candidature") -> None:
         """Après vérification humaine qu'aucun message n'est parti."""

@@ -127,6 +127,8 @@ rs interface                              # tout dans le navigateur (sous Window
                                           # lancer un cycle, relire et corriger mail et lettre, valider, rejeter,
                                           # dépôts à la main. Serveur local (127.0.0.1) : rien ne quitte la machine
 rs revue                                  # la même chose dans le terminal, une touche par élément
+rs excel                                  # met à jour ton tableau Excel de suivi (suivi.excel), fait aussi
+                                          # après chaque cycle, validation, dépôt ou réponse
 rs file                                   # ce qui attend une décision
 rs voir <id>                              # documents, note du Critique, problèmes relevés
 rs valider <id>                           # ou : éditer mail_vN.txt / lettre_vN.txt, puis rs valider <id> --modifie

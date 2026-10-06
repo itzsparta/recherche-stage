@@ -12,6 +12,7 @@
     rs liberer-envoi <id> [--nature relance1]
     rs statut                        tableau de bord
     rs interface                     interface dans le navigateur : cycle, relecture, validation
+    rs excel                         met à jour le tableau Excel de suivi (suivi.excel)
     rs revue                         passe la file en revue : valider, corriger, rejeter, déposer
     rs fermer <n°> [note]            retire un élément de rs file (alerte traitée)
     rs reprendre-enquetes            relance l'Enquête des dossiers non rédigés à fiche minimale
@@ -142,6 +143,11 @@ def cmd_interface(args) -> None:
     from .interface import Application, servir
 
     servir(Application(lambda: construire(args.config)), port=args.port, ouvrir_navigateur=not args.sans_navigateur)
+
+
+def cmd_excel(args) -> None:
+    _, orchestrateur = construire(args.config)
+    print(orchestrateur.mettre_a_jour_excel() or "Aucun tableau : renseigner suivi.excel dans config.yaml")
 
 
 def cmd_revue(args) -> None:
@@ -301,6 +307,7 @@ def main(argv: list[str] | None = None) -> None:
 
     sous.add_parser("file").set_defaults(func=cmd_file)
     sous.add_parser("revue").set_defaults(func=cmd_revue)
+    sous.add_parser("excel").set_defaults(func=cmd_excel)
     p = sous.add_parser("interface")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--sans-navigateur", action="store_true")

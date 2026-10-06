@@ -125,6 +125,9 @@ class ParamsSuivi(BaseModel):
     imap: ParamsIMAP = Field(default_factory=ParamsIMAP)
     relances_jours: list[int] = Field(default_factory=lambda: [7, 14])
     seuil_confiance_classification: float = 0.7
+    # Tableau Excel de suivi tenu à jour (candidatures validées, envoyées, réponses).
+    excel: str | None = None
+    excel_feuille: str | None = None  # par défaut : la première feuille
 
 
 class EntrepriseATS(BaseModel):

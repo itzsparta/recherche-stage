@@ -99,3 +99,7 @@ suivi:
     mot_de_passe_env: IMAP_MOT_DE_PASSE
     dossier: INBOX
   relances_jours: [7, 14]
+  # Ton tableau Excel de suivi, tenu à jour après chaque cycle et chaque validation
+  # (colonnes reconnues à leur intitulé ; tes notes et colonnes inconnues restent intactes).
+  # excel: C:\Users\moi\Documents\Suivi_candidatures.xlsx
+  # excel_feuille: Candidatures      # par défaut : la première feuille
