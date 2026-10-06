@@ -25,7 +25,7 @@ from .agents.scoring import AgentScoring
 from .agents.suivi import AgentSuivi
 from .agents.veille import AgentVeille
 from .canaux.messagerie import Boite, Expediteur
-from .llm import BudgetEpuise, ErreurLLM, QuotaEpuise
+from .llm import BudgetEpuise, ErreurLLM, NonConnecte, QuotaEpuise
 from .modeles import Critique, Dossier, Envoi, Statut
 from .reseau import ErreurReseau
 from .sources import Source
@@ -111,6 +111,14 @@ class Orchestrateur:
         self.store.fermer_escalades_globales(("quota", "budget", "suivi"), "nouveau cycle")
         try:
             self._cycle(rapport, collecter, envoyer, suivre)
+        except NonConnecte as e:
+            rapport["non_connecte"] += 1
+            self.progres(f"Arrêt du cycle : {e}")
+            self._escalader(
+                None, "quota",
+                f"{e}. Le travail fait est conservé ; dans un terminal, lancer `claude`, taper /login, "
+                "puis relancer un cycle.",
+            )
         except QuotaEpuise as e:
             rapport["quota_epuise"] += 1
             self.progres(f"Arrêt du cycle : {e}")

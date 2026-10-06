@@ -221,6 +221,21 @@ def test_quota_epuise_arrete_le_cycle_sans_penaliser_les_dossiers(orchestrateur,
     assert "quota" not in [e["type"] for e in ctx.store.escalades_ouvertes()]
 
 
+def test_session_expiree_arrete_le_cycle_sans_penaliser_les_dossiers(orchestrateur, ctx):
+    from recherche_stage.llm import NonConnecte
+
+    def deconnecte(contenu, schema):
+        raise NonConnecte("redaction : Claude Code non connecté [OAuth session expired]. Lancer `claude` puis /login")
+
+    ctx.llm.reponses["redaction"] = deconnecte
+    rapport = orchestrateur.cycle()
+    assert rapport["non_connecte"] == 1
+    [d] = ctx.store.lister()
+    assert d.statut == Statut.enquetee and not any(h.action.startswith("erreur") for h in d.historique)
+    [alerte] = ctx.store.escalades_ouvertes()
+    assert alerte["type"] == "quota" and "/login" in alerte["question"] and "aistudio" not in alerte["question"]
+
+
 def test_fermer_un_element_de_la_file(ctx):
     numero = ctx.store.escalader(None, "deadline", "question")
     assert ctx.store.fermer_escalade(numero, "vu") and not ctx.store.escalades_ouvertes()

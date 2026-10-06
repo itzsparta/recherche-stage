@@ -7,7 +7,7 @@ import pytest
 
 from recherche_stage.agents.suivi import Classification
 from recherche_stage.config import ParamsLLM
-from recherche_stage.llm import ErreurLLM, QuotaEpuise
+from recherche_stage.llm import ErreurLLM, NonConnecte, QuotaEpuise
 from recherche_stage.llm_claude_code import ClaudeCodeLLM
 from recherche_stage.llm_gemini import construire_llm
 from recherche_stage.store import Store
@@ -101,7 +101,7 @@ def test_limite_abonnement_et_connexion(horloge):
     instance = llm(horloge, commande)
     with pytest.raises(QuotaEpuise, match="abonnement Claude"):
         instance.structurer("redaction", "s", "c", Classification)
-    with pytest.raises(ErreurLLM, match="/login"):
+    with pytest.raises(NonConnecte, match="/login"):
         instance.structurer("redaction", "s", "c", Classification)
     with pytest.raises(ErreurLLM, match="introuvable"):
         instance.structurer("redaction", "s", "c", Classification)

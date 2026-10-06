@@ -27,7 +27,7 @@ from typing import Any, TypeVar
 from pydantic import BaseModel, ValidationError
 
 from .config import ParamsLLM
-from .llm import BudgetEpuise, ErreurLLM, QuotaEpuise
+from .llm import BudgetEpuise, ErreurLLM, NonConnecte, QuotaEpuise
 from .store import Store
 
 T = TypeVar("T", bound=BaseModel)
@@ -126,7 +126,7 @@ class ClaudeCodeLLM:
             if final.get("api_error_status") == 429 or "limit" in bas:
                 raise QuotaEpuise(f"Limite d'usage de l'abonnement Claude atteinte [{message[:200]}]")
             if final.get("api_error_status") in (401, 403) or "login" in bas or "authenticat" in bas:
-                raise ErreurLLM(f"{agent} : Claude Code non connecté [{message[:200]}]. Lancer `claude` puis /login")
+                raise NonConnecte(f"{agent} : Claude Code non connecté [{message[:200]}]. Lancer `claude` puis /login")
             raise ErreurLLM(f"{agent} : Claude Code en échec [{message[:300]}]")
         return evenements, final
 

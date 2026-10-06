@@ -36,6 +36,11 @@ class QuotaEpuise(BudgetEpuise):
     inutile de continuer le cycle, chaque appel échouerait aussi."""
 
 
+class NonConnecte(QuotaEpuise):
+    """Compte du fournisseur déconnecté (session expirée) : comme pour un quota,
+    chaque appel échouerait, et ce n'est pas la faute du dossier en cours."""
+
+
 class LLM(Protocol):
     def structurer(self, agent: str, systeme: str, contenu: str, schema: type[T], critique: bool = False) -> T: ...
 
