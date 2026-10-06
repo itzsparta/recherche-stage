@@ -22,14 +22,16 @@ from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Callable
-from urllib.parse import quote_plus
+from urllib.parse import parse_qs, quote_plus, urlparse
 
+from . import reglages, verifications
 from .agents.base import Contexte
 from .autonomie import envoi_automatique_debloque, taux_validation
 from .excel import LIBELLES_STATUT, _etat, a_exporter
 from .modeles import Dossier, Statut
 from .orchestrateur import Orchestrateur
 from .presentiel import itineraires, ordonner, point_connu, point_dossier
+from .canaux.pdf_simple import texte_vers_pdf
 from .revue import VALIDABLES, ouvrir
 
 PAGE = Path(__file__).resolve().parent / "interface.html"
@@ -42,13 +44,15 @@ class Refus(Exception):
 
 
 class Application:
-    def __init__(self, fabrique: Fabrique, ouvrir: Callable[[str], None] = ouvrir, arriere_plan: bool = True):
+    def __init__(self, fabrique: Fabrique, ouvrir: Callable[[str], None] = ouvrir, arriere_plan: bool = True,
+                 chemin_config: str | Path | None = None):
         self.fabrique = fabrique
+        self.chemin_config = chemin_config  # réglages modifiables depuis la page
         self.ctx, self.orch = fabrique()
         self.ouvrir = ouvrir
         self.arriere_plan = arriere_plan
         self.jeton = secrets.token_urlsafe(24)
-        self.cycle = {"en_cours": False, "lignes": [], "rapport": None, "erreur": None}
+        self.cycle = {"en_cours": False, "nature": "cycle", "lignes": [], "rapport": None, "erreur": None}
 
     # ------------------------------------------------------------------ état
 
@@ -68,6 +72,7 @@ class Application:
             "file": self._file(),
             "candidatures": self._candidatures(dossiers),
             "tournee": self._tournee(dossiers),
+            "reglages": reglages.lire(cfg) if self.chemin_config else None,
         }
 
     # ------------------------------------------------------- mes candidatures
@@ -165,9 +170,67 @@ class Application:
             "objet": doc.objet_mail, "mail": doc.mail, "lettre": doc.texte_lettre, "version": doc.version,
             "canal": d.envoi.canal, "destinataire": d.envoi.destinataire,
             "presentiel": d.presentiel.model_dump() if d.presentiel and d.presentiel.conseille else None,
+            "precedente": self._version_precedente(d),
             "faits": [{"texte": f.texte, "source": f.source} for f in d.fiche_entreprise.faits],
             "recherche": f"https://duckduckgo.com/?q={quote_plus(o.entreprise + ' recrutement stage candidature')}",
         }
+
+    def _version_precedente(self, d: Dossier) -> dict | None:
+        """Textes de la version d'avant (fichiers *_v{n-1}), pour comparer après une réécriture."""
+        n = d.documents.version - 1
+        if n < 1 or d.etape_attente not in ("critique", "envoi"):
+            return None
+        fichiers = self.ctx.config.dossier_donnees / "dossiers" / d.id
+        mail, lettre = fichiers / f"mail_v{n}.txt", fichiers / f"lettre_v{n}.txt"
+        if not mail.exists():
+            return None
+        objet, _, corps = mail.read_text(encoding="utf-8").partition("\n\n")
+        return {"version": n, "objet": objet.removeprefix("Objet : "), "mail": corps,
+                "lettre": lettre.read_text(encoding="utf-8") if lettre.exists() else ""}
+
+    def lettre_pdf(self, dossier_id: str) -> bytes:
+        """Aperçu de la lettre telle qu'elle partira en pièce jointe (dernière version enregistrée)."""
+        dossier = self.ctx.store.get(dossier_id)
+        if dossier is None or not dossier.documents.texte_lettre:
+            raise Refus("Pas de lettre pour ce dossier.")
+        chemin = texte_vers_pdf(dossier.documents.texte_lettre, self.ctx.dossier_fichiers(dossier.id) / "apercu_lettre.pdf")
+        return chemin.read_bytes()
+
+    # ------------------------------------------------- vérifications, réglages
+
+    def verifier(self) -> list[dict]:
+        return verifications.verifier(self.ctx)
+
+    def tester_llm(self) -> str:
+        if self.cycle["en_cours"]:
+            raise Refus("Un cycle est en cours : attendre sa fin.")
+
+        def travail(orch: Orchestrateur) -> Counter:
+            orch.progres("Test de connexion au LLM…")
+            ok, message = verifications.tester_llm(orch.ctx)
+            orch.progres(("✓ " if ok else "✗ ") + message)
+            return Counter(test_ok=int(ok))
+
+        self._lancer(travail, "test")
+        return "Test lancé : le résultat s'affiche dans le journal."
+
+    def enregistrer_reglages(self, valeurs: dict) -> str:
+        if not self.chemin_config:
+            raise Refus("Réglages indisponibles : interface lancée sans fichier de configuration.")
+        try:
+            changes = reglages.enregistrer(self.chemin_config, valeurs)
+        except reglages.ReglageRefuse as e:
+            raise Refus(str(e)) from e
+        if not changes:
+            return "Rien n'a changé."
+        self.ctx, self.orch = self.fabrique()  # configuration relue
+        if any(c.startswith("presentiel.") for c in changes):  # dépôts sur place à rejuger avec les nouveaux seuils
+            for d in self.ctx.store.lister():
+                if d.presentiel is not None and not d.presentiel.depose_le:
+                    d.presentiel = None
+                    self.ctx.store.save(d)
+        libelles = [reglages.CHAMPS[tuple(c.split(".", 1))][0] for c in changes]
+        return "Enregistré dans config.yaml : " + ", ".join(libelles) + ". Pris en compte dès le prochain cycle."
 
     @staticmethod
     def _actions(d: Dossier | None) -> list[str]:
@@ -187,6 +250,8 @@ class Application:
         if self.cycle["en_cours"]:
             raise Refus("Un cycle est en cours : attendre sa fin.")
         nom = donnees.get("action")
+        if nom == "reglages":
+            return self.enregistrer_reglages(donnees.get("valeurs") or {})
         if nom == "consignes":
             self.ctx.store.definir_parametre("consignes_redaction", str(donnees.get("texte", "")).strip())
             return "Préférences enregistrées : elles s'appliquent aux prochaines rédactions et réécritures."
@@ -213,7 +278,7 @@ class Application:
                 return "Validé."
             if nom == "reecrire":
                 self.orch.reecrire(dossier.id, str(donnees.get("consigne", "")))
-                self._lancer(lambda orch: orch.rediger(dossier.id))
+                self._lancer(lambda orch: orch.rediger(dossier.id), "reecriture")
                 return f"Réécriture de {dossier.offre.entreprise} lancée : la nouvelle version revient dans la file."
             if nom == "rejeter":
                 self.orch.rejeter(dossier.id, str(donnees.get("motif", "")).strip())
@@ -244,7 +309,7 @@ class Application:
                 self.orch.indiquer_reponse(dossier.id, "refus")
                 return f"Refus de {dossier.offre.entreprise} enregistré : plus de relance."
             # Un entretien prépare une fiche (appel au LLM) : en arrière-plan, comme un cycle.
-            self._lancer(lambda orch: orch.indiquer_reponse(dossier.id, "entretien") or Counter(entretien=1))
+            self._lancer(lambda orch: orch.indiquer_reponse(dossier.id, "entretien") or Counter(entretien=1), "entretien")
             return f"Entretien chez {dossier.offre.entreprise} : la fiche de préparation se rédige, elle arrivera dans « À traiter »."
         except (ValueError, RuntimeError) as e:
             raise Refus(str(e)) from e
@@ -269,12 +334,12 @@ class Application:
         if self.cycle["en_cours"]:
             raise Refus("Un cycle est déjà en cours.")
         self._lancer(lambda orch: orch.cycle(
-            collecter=True, envoyer=not options.get("sans_envoi"), suivre=not options.get("sans_suivi")))
+            collecter=True, envoyer=not options.get("sans_envoi"), suivre=not options.get("sans_suivi")), "cycle")
         return "Cycle lancé."
 
-    def _lancer(self, travail: Callable[[Orchestrateur], Counter]) -> None:
-        """Travail long (cycle, réécriture) hors du fil du serveur, suivi par la page."""
-        self.cycle = {"en_cours": True, "lignes": [], "rapport": None, "erreur": None}
+    def _lancer(self, travail: Callable[[Orchestrateur], Counter], nature: str = "travail") -> None:
+        """Travail long (cycle, réécriture, test) hors du fil du serveur, suivi par la page."""
+        self.cycle = {"en_cours": True, "nature": nature, "lignes": [], "rapport": None, "erreur": None}
         execution = threading.Thread(target=self._travailler, args=(travail,), daemon=True)
         if self.arriere_plan:
             execution.start()
@@ -330,6 +395,12 @@ def gestionnaire(app: Application, hotes: set[str]):
                 self._repondre(200, page.encode("utf-8"), "text/html; charset=utf-8")
             elif self.path == "/api/etat":
                 self._json(200, app.etat())
+            elif self.path.startswith("/lettre.pdf?"):
+                dossier = parse_qs(urlparse(self.path).query).get("dossier", [""])[0]
+                try:
+                    self._repondre(200, app.lettre_pdf(dossier), "application/pdf")
+                except Refus as e:
+                    self._json(404, {"erreur": str(e)})
             else:
                 self._json(404, {"erreur": "introuvable"})
 
@@ -346,6 +417,10 @@ def gestionnaire(app: Application, hotes: set[str]):
                     self._json(200, {"message": app.action(donnees)})
                 elif self.path == "/api/cycle":
                     self._json(200, {"message": app.lancer_cycle(donnees)})
+                elif self.path == "/api/verifier":
+                    self._json(200, {"points": app.verifier()})
+                elif self.path == "/api/tester-llm":
+                    self._json(200, {"message": app.tester_llm()})
                 else:
                     self._json(404, {"erreur": "introuvable"})
             except Refus as e:

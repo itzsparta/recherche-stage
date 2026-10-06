@@ -143,7 +143,7 @@ def cmd_voir(args) -> None:
 def cmd_interface(args) -> None:
     from .interface import Application, servir
 
-    servir(Application(lambda: construire(args.config)), port=args.port, ouvrir_navigateur=not args.sans_navigateur)
+    servir(Application(lambda: construire(args.config), chemin_config=args.config), port=args.port, ouvrir_navigateur=not args.sans_navigateur)
 
 
 def cmd_consignes(args) -> None:

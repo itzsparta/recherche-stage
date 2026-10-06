@@ -78,7 +78,10 @@ def test_reecrire_avec_consigne_et_preferences(app, ctx):
     nouveau = par_entreprise(ctx, "Exemple Énergie")
     assert nouveau.documents.version == d["version"] + 1 and nouveau.etape_attente == "envoi"  # de retour dans la file
     assert ctx.store.decisions_humaines()[-1]["decision"] == "reecrire"
-    assert app.cycle["rapport"] and not app.cycle["en_cours"]
+    assert app.cycle["rapport"] and not app.cycle["en_cours"] and app.cycle["nature"] == "reecriture"
+    precedente = carte(app, "Exemple Énergie")["dossier"]["precedente"]  # pour comparer les deux versions
+    assert precedente["version"] == d["version"] and precedente["objet"] == d["objet"] and precedente["mail"] == d["mail"]
+    assert precedente["lettre"] == d["lettre"]
     with pytest.raises(Refus, match="changer"):
         app.action({"action": "reecrire", "dossier": d["id"], "consigne": "  "})
 
@@ -181,3 +184,52 @@ def test_tournee_sur_place(app, ctx):
     assert etat["tournee"]["arrets"] == [] and [e["dossier"]["entreprise"] for e in etat["file"]] == ["Autre Énergie"]
     with pytest.raises(Refus, match="pas dans la tournée"):
         app.action({"action": "sur_place", "dossier": par_entreprise(ctx, "Autre Énergie").id})
+
+
+def test_apercu_pdf_verifications_et_reglages(app, ctx, tmp_path):
+    d = carte(app, "Exemple Énergie")["dossier"]
+    assert d["precedente"] is None  # première version
+    assert app.lettre_pdf(d["id"]).startswith(b"%PDF")
+    with pytest.raises(Refus, match="Pas de lettre"):
+        app.lettre_pdf("inconnu")
+
+    cles = {p["cle"]: p for p in app.verifier()}
+    assert cles["profil"]["ok"] and "llm" in cles and "excel" not in cles  # pas de tableau configuré
+
+    assert app.etat()["reglages"] is None  # interface lancée sans fichier de configuration
+    with pytest.raises(Refus, match="indisponibles"):
+        app.action({"action": "reglages", "valeurs": {}})
+
+    chemin = tmp_path / "config.yaml"
+    chemin.write_text("presentiel:\n  distance_max_km: 30  # garder ce commentaire\n", encoding="utf-8")
+    app.chemin_config = chemin
+    proche = par_entreprise(ctx, "Exemple Énergie")
+    from recherche_stage.modeles import Presentiel
+
+    proche.presentiel = Presentiel(conseille=False, raison="à 40 km")
+    ctx.store.save(proche)
+    champs = {c["id"]: c for c in app.etat()["reglages"]}
+    assert champs["presentiel.distance_max_km"]["valeur"] == 30
+    assert "Distance maximale" in app.action({"action": "reglages", "valeurs": {"presentiel.distance_max_km": "45",
+                                                                                  "sources.annuaire_departements": "62, 59"}})
+    texte = chemin.read_text(encoding="utf-8")
+    assert "distance_max_km: 45.0  # garder ce commentaire" in texte and 'annuaire_departements: ["62", "59"]' in texte
+    assert par_entreprise(ctx, "Exemple Énergie").presentiel is None  # rejugé avec le nouveau seuil
+    assert app.action({"action": "reglages", "valeurs": {"presentiel.distance_max_km": "45"}}) == "Rien n'a changé."
+    with pytest.raises(Refus, match="pas un nombre"):
+        app.action({"action": "reglages", "valeurs": {"orchestrateur.dossiers_max_par_cycle": "trois"}})
+
+
+def test_tester_le_llm(app, ctx):
+    from recherche_stage.llm import NonConnecte
+
+    ctx.llm.reponses["verification"] = {"ok": True}
+    app.tester_llm()
+    assert app.cycle["nature"] == "test" and "✓ Le LLM répond" in app.cycle["lignes"][-1]
+
+    def expire(contenu, schema):
+        raise NonConnecte("verification : Claude Code non connecté")
+
+    ctx.llm.reponses["verification"] = expire
+    app.tester_llm()
+    assert "✗ Session Claude expirée" in app.cycle["lignes"][-1] and "/login" in app.cycle["lignes"][-1]

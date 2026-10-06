@@ -130,6 +130,11 @@ rs interface                              # tout dans le navigateur (sous Window
                                           # (statut, relance prévue, réponse entretien/refus à saisir) ;
                                           # « Sur place » (tournée ordonnée, itinéraire, impression des lettres,
                                           # « Déposée ✓ », qui vaut envoi). Motifs de rejet repris dans `rs bilan`
+                                          # Avant un cycle : vérification (session Claude, Excel ouvert, ports mail),
+                                          # avancement par étapes, notification à la fin. Comparaison avec la
+                                          # version précédente, lettre en PDF, filtres, raccourcis clavier (« ? »).
+                                          # Panneau « Réglages » : zone, secteurs, rythme, présentiel, Excel,
+                                          # écrits dans config.yaml (jamais de clé ni de mot de passe)
 rs revue                                  # la même chose dans le terminal, une touche par élément
 rs consignes "Parcours académique d'abord"  # préférences de rédaction pour toutes les lettres
                                           # (dans l'interface : « Mes préférences de rédaction » ; et sur chaque
