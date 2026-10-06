@@ -187,6 +187,7 @@ class Dossier(BaseModel):
     modifie_par_humain: bool = False
     etape_attente: str = ""  # étape bloquée sur l'humain : scoring, enquete, critique, envoi, suivi
     valide_humain: list[str] = Field(default_factory=list)  # étapes débloquées par l'humain
+    consigne_humain: str = ""  # demande de l'humain pour la dernière réécriture
 
     def tracer(self, agent: str, action: str, entrees_hash: str = "") -> None:
         self.historique.append(EntreeHistorique(agent=agent, action=action, entrees_hash=entrees_hash))

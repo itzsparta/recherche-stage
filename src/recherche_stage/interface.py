@@ -59,6 +59,7 @@ class Application:
             "fournisseur": cfg.llm.fournisseur,
             "autonomie": {"debloquee": envoi_automatique_debloque(store, cfg), "taux": taux, "n": n, "fenetre": cfg.autonomie.fenetre},
             "cycle": self.cycle,
+            "consignes": store.parametre("consignes_redaction", "") or "",
             "file": self._file(),
         }
 
@@ -100,6 +101,8 @@ class Application:
         if d.etape_attente == "depot":
             return ["deposer", "rejeter", "ouvrir"]
         if d.etape_attente in VALIDABLES or d.etape_attente.startswith("relance:"):
+            if d.documents.version and d.etape_attente in ("critique", "envoi"):
+                return ["valider", "reecrire", "rejeter", "ouvrir"]
             return ["valider", "rejeter", "ouvrir"]
         return ["fermer", "rejeter"]
 
@@ -109,6 +112,9 @@ class Application:
         if self.cycle["en_cours"]:
             raise Refus("Un cycle est en cours : attendre sa fin.")
         nom = donnees.get("action")
+        if nom == "consignes":
+            self.ctx.store.definir_parametre("consignes_redaction", str(donnees.get("texte", "")).strip())
+            return "Préférences enregistrées : elles s'appliquent aux prochaines rédactions et réécritures."
         if nom == "fermer":
             if not self.ctx.store.fermer_escalade(int(donnees["escalade"]), "interface"):
                 raise Refus("Élément déjà traité.")
@@ -128,6 +134,10 @@ class Application:
                 if d.envoi.canal == "email":
                     return f"Validé{' avec tes corrections' if modifie else ''} : part à {d.envoi.destinataire} au prochain cycle (lun.–jeu., 8 h–11 h)."
                 return "Validé."
+            if nom == "reecrire":
+                self.orch.reecrire(dossier.id, str(donnees.get("consigne", "")))
+                self._lancer(lambda orch: orch.rediger(dossier.id))
+                return f"Réécriture de {dossier.offre.entreprise} lancée : la nouvelle version revient dans la file."
             if nom == "rejeter":
                 self.orch.rejeter(dossier.id, str(donnees.get("motif", "")).strip())
                 return "Rejeté."
@@ -161,22 +171,26 @@ class Application:
     def lancer_cycle(self, options: dict) -> str:
         if self.cycle["en_cours"]:
             raise Refus("Un cycle est déjà en cours.")
+        self._lancer(lambda orch: orch.cycle(
+            collecter=True, envoyer=not options.get("sans_envoi"), suivre=not options.get("sans_suivi")))
+        return "Cycle lancé."
+
+    def _lancer(self, travail: Callable[[Orchestrateur], Counter]) -> None:
+        """Travail long (cycle, réécriture) hors du fil du serveur, suivi par la page."""
         self.cycle = {"en_cours": True, "lignes": [], "rapport": None, "erreur": None}
-        execution = threading.Thread(target=self._cycle, args=(options,), daemon=True)
+        execution = threading.Thread(target=self._travailler, args=(travail,), daemon=True)
         if self.arriere_plan:
             execution.start()
         else:
             execution.run()
-        return "Cycle lancé."
 
-    def _cycle(self, options: dict) -> None:
+    def _travailler(self, travail: Callable[[Orchestrateur], Counter]) -> None:
         etat = self.cycle
         try:
-            # Connexion SQLite propre au fil d'exécution du cycle.
+            # Connexion SQLite propre au fil d'exécution du travail.
             _, orch = self.fabrique() if self.arriere_plan else (self.ctx, self.orch)
             orch.progres = etat["lignes"].append
-            rapport = orch.cycle(collecter=True, envoyer=not options.get("sans_envoi"), suivre=not options.get("sans_suivi"))
-            etat["rapport"] = dict(sorted(rapport.items()))
+            etat["rapport"] = dict(sorted(travail(orch).items()))
         except Exception as e:  # affiché dans la page plutôt que perdu dans la console
             etat["erreur"] = f"{type(e).__name__} : {e}"
             traceback.print_exc()

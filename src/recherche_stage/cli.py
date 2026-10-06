@@ -12,6 +12,7 @@
     rs liberer-envoi <id> [--nature relance1]
     rs statut                        tableau de bord
     rs interface                     interface dans le navigateur : cycle, relecture, validation
+    rs consignes [texte]             préférences de rédaction pour toutes les lettres (ex. parcours avant projets)
     rs excel                         met à jour le tableau Excel de suivi (suivi.excel)
     rs revue                         passe la file en revue : valider, corriger, rejeter, déposer
     rs fermer <n°> [note]            retire un élément de rs file (alerte traitée)
@@ -143,6 +144,13 @@ def cmd_interface(args) -> None:
     from .interface import Application, servir
 
     servir(Application(lambda: construire(args.config)), port=args.port, ouvrir_navigateur=not args.sans_navigateur)
+
+
+def cmd_consignes(args) -> None:
+    ctx, _ = construire(args.config)
+    if args.texte:
+        ctx.store.definir_parametre("consignes_redaction", " ".join(args.texte))
+    print(ctx.store.parametre("consignes_redaction", "") or "Aucune préférence de rédaction.")
 
 
 def cmd_excel(args) -> None:
@@ -308,6 +316,9 @@ def main(argv: list[str] | None = None) -> None:
     sous.add_parser("file").set_defaults(func=cmd_file)
     sous.add_parser("revue").set_defaults(func=cmd_revue)
     sous.add_parser("excel").set_defaults(func=cmd_excel)
+    p = sous.add_parser("consignes")
+    p.add_argument("texte", nargs="*")
+    p.set_defaults(func=cmd_consignes)
     p = sous.add_parser("interface")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--sans-navigateur", action="store_true")

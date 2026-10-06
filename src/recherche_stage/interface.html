@@ -88,6 +88,14 @@
     <pre class="journal" id="journal"></pre>
   </div>
 
+  <details class="panneau" id="preferences" style="margin-top:12px">
+    <summary>Mes préférences de rédaction (pour toutes les lettres)</summary>
+    <p class="sous">Ex. : « Mettre en avant mon parcours académique (prépa, école d'ingénieur, matières). Ne citer le TIPE qu'en une phrase, et seulement s'il est en lien avec le poste. »
+      Le rédacteur n'invente jamais rien : il choisit seulement quoi mettre en avant dans ton profil.</p>
+    <textarea id="consignes" rows="4" aria-label="Préférences de rédaction"></textarea>
+    <div class="actions"><button id="enregistrer-consignes">Enregistrer</button></div>
+  </details>
+
   <h2 id="titre-file">À traiter</h2>
   <div id="file"></div>
 </main>
@@ -155,12 +163,12 @@ function afficherCycle(c) {
   document.querySelectorAll(".carte button").forEach(b => b.disabled = c.en_cours);
   const journal = document.getElementById("journal");
   const lignes = [...c.lignes];
-  if (c.rapport) lignes.push("Cycle terminé : " + (Object.entries(c.rapport).map(([k, v]) => `${k} ${v}`).join(", ") || "rien à faire"));
+  if (c.rapport) lignes.push("Terminé : " + (Object.entries(c.rapport).map(([k, v]) => `${k} ${v}`).join(", ") || "rien à faire"));
   if (c.erreur) lignes.push("Erreur : " + c.erreur);
   journal.style.display = lignes.length ? "block" : "none";
   journal.textContent = lignes.join("\n");
   journal.scrollTop = journal.scrollHeight;
-  document.getElementById("cycle-etat").textContent = c.en_cours ? "Cycle en cours… (les actions attendent sa fin)" : "";
+  document.getElementById("cycle-etat").textContent = c.en_cours ? "En cours… (les actions attendent la fin)" : "";
 }
 
 function afficherFile(elements) {
@@ -241,6 +249,10 @@ function creerCarte(e) {
     }));
     if (a === "ouvrir") actions.append(bouton("Ouvrir le dossier", "", () => agir(carte, { action: "ouvrir", dossier: d.id }, false)));
     if (a === "fermer") actions.append(bouton("C'est noté, retirer", "", () => agir(carte, { action: "fermer", escalade: e.escalade })));
+    if (a === "reecrire") actions.append(bouton("Réécrire…", "", () => {
+      const consigne = prompt(`Que changer dans la candidature ${d.entreprise} ?\n(ex. « moins sur le TIPE, plus sur mon parcours académique »)`, "");
+      if (consigne && consigne.trim()) agir(carte, { action: "reecrire", dossier: d.id, consigne });
+    }));
     if (a === "rejeter") actions.append(bouton("Rejeter", "danger", () => {
       const motif = prompt(`Rejeter ${d.entreprise} ? Motif (facultatif) :`, "");
       if (motif !== null) agir(carte, { action: "rejeter", dossier: d.id, motif });
@@ -271,6 +283,7 @@ async function agir(carte, donnees, retirer = true) {
   try {
     toast(await poster("/api/action", donnees));
     if (retirer) carte.remove();
+    if (donnees.action === "reecrire") setTimeout(suivreCycle, 500);
   } catch (err) {
     toast(err.message, true);
   } finally {
@@ -289,10 +302,19 @@ document.getElementById("lancer").addEventListener("click", async () => {
 async function suivreCycle() {
   const etat = await rafraichir();
   if (etat.cycle.en_cours) setTimeout(suivreCycle, 1500);
-  else if (etat.cycle.rapport || etat.cycle.erreur) toast(etat.cycle.erreur ? "Cycle interrompu : voir le journal" : "Cycle terminé", !!etat.cycle.erreur);
+  else if (etat.cycle.rapport || etat.cycle.erreur) toast(etat.cycle.erreur ? "Interrompu : voir le journal" : "Terminé", !!etat.cycle.erreur);
 }
 
-rafraichir().then(etat => { if (etat.cycle.en_cours) suivreCycle(); }).catch(err => toast("Serveur injoignable : relancer rs interface", true));
+document.getElementById("enregistrer-consignes").addEventListener("click", async () => {
+  try { toast(await poster("/api/action", { action: "consignes", texte: document.getElementById("consignes").value })); }
+  catch (err) { toast(err.message, true); }
+});
+
+rafraichir().then(etat => {
+  document.getElementById("consignes").value = etat.consignes;
+  if (etat.consignes) document.getElementById("preferences").open = true;
+  if (etat.cycle.en_cours) suivreCycle();
+}).catch(err => toast("Serveur injoignable : relancer rs interface", true));
 </script>
 </body>
 </html>

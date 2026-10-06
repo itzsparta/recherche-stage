@@ -127,6 +127,9 @@ rs interface                              # tout dans le navigateur (sous Window
                                           # lancer un cycle, relire et corriger mail et lettre, valider, rejeter,
                                           # dépôts à la main. Serveur local (127.0.0.1) : rien ne quitte la machine
 rs revue                                  # la même chose dans le terminal, une touche par élément
+rs consignes "Parcours académique d'abord"  # préférences de rédaction pour toutes les lettres
+                                          # (dans l'interface : « Mes préférences de rédaction » ; et sur chaque
+                                          # carte, « Réécrire… » avec une consigne propre à cette candidature)
 rs excel                                  # met à jour ton tableau Excel de suivi (suivi.excel), fait aussi
                                           # après chaque cycle, validation, dépôt ou réponse
 rs file                                   # ce qui attend une décision

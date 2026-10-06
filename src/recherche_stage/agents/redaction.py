@@ -40,7 +40,9 @@ Exigences :
 - Lettre : 250 à 400 mots, registre soutenu, en paragraphes. Mail : 80 à 150 mots, il accompagne les pièces jointes.
 - `affirmations` : chaque phrase factuelle de la lettre, du mail et de l'accroche du CV, avec les identifiants qui la fondent (ex. exp1, comp_python, form1, fiche:0, offre).
 - `competences_cv` : identifiants de compétences du profil à mettre en avant, les plus pertinentes d'abord.
-- Si des corrections du relecteur sont fournies, applique-les toutes."""
+- Si des corrections du relecteur sont fournies, applique-les toutes.
+- Les préférences et demandes du candidat orientent le choix et le poids des éléments mis en avant ;
+  elles ne lèvent jamais la règle absolue (rien hors des sources)."""
 
 
 class QuestionReponse(BaseModel):
@@ -139,13 +141,18 @@ class AgentRedaction(Agent):
             f"Angle d'accroche imposé : {ANGLES[angle]}" if angle else "Angle d'accroche : à choisir parmi " + ", ".join(ANGLES),
             "Fiche entreprise minimale : aucune information vérifiée sur l'entreprise en dehors de l'offre." if fiche.minimale else "",
         ]
-        if dossier.critique.decision == "renvoyer":
+        preferences = (self.ctx.store.parametre("consignes_redaction", "") or "").strip()
+        if preferences:
+            consignes.append(f"PRÉFÉRENCES DU CANDIDAT (pour toutes ses candidatures) :\n{preferences}")
+        if dossier.consigne_humain:
+            consignes.append(f"DEMANDE DU CANDIDAT POUR CETTE VERSION (prioritaire sur l'angle imposé) :\n{dossier.consigne_humain}")
+        if dossier.critique.decision == "renvoyer" or (dossier.consigne_humain and dossier.documents.version):
             corrections = "\n".join(
                 f"- [{p.gravite}/{p.type}] « {p.extrait} » : {p.raison} → {p.correction}" for p in dossier.critique.problemes
             )
             consignes.append(
-                f"CORRECTIONS DU RELECTEUR (itération {dossier.critique.iteration}) :\n{corrections}\n\n"
-                f"VERSION PRÉCÉDENTE :\nObjet : {dossier.documents.objet_mail}\nMail : {dossier.documents.mail}\n"
+                (f"CORRECTIONS DU RELECTEUR (itération {dossier.critique.iteration}) :\n{corrections}\n\n" if corrections else "")
+                + f"VERSION PRÉCÉDENTE :\nObjet : {dossier.documents.objet_mail}\nMail : {dossier.documents.mail}\n"
                 f"Lettre : {dossier.documents.texte_lettre}"
             )
         contenu = "\n\n".join(

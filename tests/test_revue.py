@@ -84,3 +84,11 @@ def test_alerte_globale_fermee(ctx, orchestrateur):
     ctx.store.escalader(None, "deadline", "Deadline dépassée")
     assert revue(ctx, orchestrateur, "f")[0] == {"fermees": 1}
     assert revue(ctx, orchestrateur)[1].startswith("Rien en attente.")
+
+
+def test_reecrire_depuis_la_revue(ctx, orchestrateur):
+    premier = ctx.store.get(ctx.store.escalades_ouvertes()[0]["dossier_id"])
+    bilan, texte = revue(ctx, orchestrateur, "e", "plus sur mon parcours académique", "v", "q")
+    assert bilan == {"reecrites": 1, "validees": 1} and "Nouvelle version" in texte
+    d = ctx.store.get(premier.id)
+    assert d.documents.version == premier.documents.version + 1 and d.consigne_humain.startswith("plus sur")

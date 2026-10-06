@@ -26,7 +26,7 @@ from .agents.suivi import AgentSuivi
 from .agents.veille import AgentVeille
 from .canaux.messagerie import Boite, Expediteur
 from .llm import BudgetEpuise, ErreurLLM, QuotaEpuise
-from .modeles import Dossier, Statut
+from .modeles import Critique, Dossier, Envoi, Statut
 from .reseau import ErreurReseau
 from .sources import Source
 
@@ -164,7 +164,7 @@ class Orchestrateur:
             # en premier ; puis les meilleurs scores, dans la limite du cycle.
             a_rediger = sorted(
                 self.store.lister([Statut.enquetee, Statut.redigee, Statut.en_critique]),
-                key=lambda d: (d.statut != Statut.enquetee, d.prioritaire, d.score.valeur),
+                key=lambda d: (d.statut != Statut.enquetee, bool(d.consigne_humain), d.prioritaire, d.score.valeur),
                 reverse=True,
             )[:par_cycle]
             for i, dossier in enumerate(a_rediger, 1):
@@ -339,6 +339,43 @@ class Orchestrateur:
         self.store.save(dossier)
         self.mettre_a_jour_excel()
         return etape
+
+    def reecrire(self, dossier_id: str, consigne: str) -> None:
+        """Renvoie les documents à la Rédaction avec la demande de l'humain
+        (« moins sur le TIPE, plus sur le parcours… »). Rien n'est perdu :
+        la version précédente sert de base, l'entreprise reste candidate."""
+        consigne = consigne.strip()
+        if not consigne:
+            raise ValueError("Dire ce qu'il faut changer")
+        dossier = self._dossier(dossier_id)
+        etape = dossier.etape_attente
+        if etape not in ("critique", "envoi"):
+            raise ValueError(f"Le dossier {dossier_id} n'a pas de documents en attente de relecture")
+        self.store.enregistrer_decision(dossier.id, "reecrire" if etape == "envoi" else "critique:reecrire", consigne)
+        self.store.resoudre_escalades(dossier.id, "réécriture demandée")
+        dossier.consigne_humain = consigne
+        dossier.statut = Statut.enquetee
+        dossier.etape_attente = ""
+        dossier.motif = ""
+        dossier.critique = Critique()
+        dossier.envoi = Envoi()
+        dossier.tracer("humain", "reecriture", self.store.memoriser_entrees({"consigne": consigne}))
+        self.store.save(dossier)
+
+    def rediger(self, dossier_id: str) -> Counter:
+        """Rédaction → Critique pour un seul dossier, puis brouillon s'il est validé."""
+        rapport: Counter = Counter()
+        dossier = self._dossier(dossier_id)
+        self.progres(f"Rédaction et critique : {dossier.offre.entreprise}")
+        try:
+            self._rediger_et_critiquer(dossier, rapport)
+            if dossier.statut == Statut.validee and dossier.envoi.canal is None:
+                if self._executer("envoi", dossier, lambda d=dossier: self.envoi.preparer(d)):
+                    rapport["brouillons"] += 1
+        except QuotaEpuise as e:
+            rapport["quota_epuise"] += 1
+            self.progres(f"Arrêt : {e}")
+        return rapport
 
     def reprendre_enquetes(self) -> int:
         """Renvoie à l'Enquête les dossiers pas encore rédigés dont la fiche est

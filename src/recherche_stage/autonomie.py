@@ -12,7 +12,7 @@ from .config import Config
 from .modeles import Dossier
 from .store import Store
 
-DECISIONS_ENVOI = ("valide_tel_quel", "modifie", "rejete")
+DECISIONS_ENVOI = ("valide_tel_quel", "modifie", "rejete", "reecrire")
 
 
 def taux_validation(store: Store, fenetre: int) -> tuple[float, int]:

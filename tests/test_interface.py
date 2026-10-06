@@ -29,7 +29,7 @@ def test_etat_montre_la_file_et_les_documents(app):
     etat = app.etat()
     assert etat["statuts"]["en_attente_humain"] == 3 and etat["envois"] == [0, 15]
     e = carte(app, "Exemple Énergie")
-    assert e["actions"] == ["valider", "rejeter", "ouvrir"]
+    assert e["actions"] == ["valider", "reecrire", "rejeter", "ouvrir"]
     assert e["dossier"]["modifiable"] and e["dossier"]["mail"].startswith("Bonjour") and e["dossier"]["lettre"]
 
 
@@ -63,6 +63,24 @@ def test_corrections_refusees_et_actions_perimees(app, ctx):
     app.action({"action": "rejeter", "dossier": d["id"], "motif": "pas pour moi"})
     with pytest.raises(Refus, match="plus possible"):
         app.action({"action": "valider", "dossier": d["id"]})
+
+
+def test_reecrire_avec_consigne_et_preferences(app, ctx):
+    assert "enregistrées" in app.action({"action": "consignes", "texte": "Parcours académique d'abord, TIPE en une phrase."})
+    assert app.etat()["consignes"].startswith("Parcours")
+    d = carte(app, "Exemple Énergie")["dossier"]
+    assert "Réécriture" in app.action({"action": "reecrire", "dossier": d["id"], "consigne": "moins sur le TIPE"})
+
+    redaction = [c for a, c, _ in ctx.llm.appels if a == "redaction"][-1]
+    assert "PRÉFÉRENCES DU CANDIDAT" in redaction and "Parcours académique d'abord" in redaction
+    assert "DEMANDE DU CANDIDAT POUR CETTE VERSION" in redaction and "moins sur le TIPE" in redaction
+    assert "VERSION PRÉCÉDENTE" in redaction
+    nouveau = par_entreprise(ctx, "Exemple Énergie")
+    assert nouveau.documents.version == d["version"] + 1 and nouveau.etape_attente == "envoi"  # de retour dans la file
+    assert ctx.store.decisions_humaines()[-1]["decision"] == "reecrire"
+    assert app.cycle["rapport"] and not app.cycle["en_cours"]
+    with pytest.raises(Refus, match="changer"):
+        app.action({"action": "reecrire", "dossier": d["id"], "consigne": "  "})
 
 
 def test_cycle_depuis_la_page(app):

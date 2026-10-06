@@ -126,7 +126,22 @@ class Revue:
                 self._rejeter(dossier)
             return r != "q"
 
-        r = self._choix("[v]alider  [m]odifier puis valider  [r]ejeter  [s]auter  [q]uitter : ", "vmrsq")
+        reecrivable = bool(dossier.documents.version) and dossier.etape_attente in ("critique", "envoi")
+        r = self._choix(
+            "[v]alider  [m]odifier puis valider  " + ("[e] réécrire avec une consigne  " if reecrivable else "")
+            + "[r]ejeter  [s]auter  [q]uitter : ", "vmrsq" + ("e" if reecrivable else ""))
+        if r == "e":
+            consigne = self.demander("Que changer ? (ex. « moins sur le TIPE, plus sur mon parcours ») : ").strip()
+            if consigne:
+                self.orch.reecrire(dossier.id, consigne)
+                self.orch.progres = self.afficher
+                self.orch.rediger(dossier.id)
+                self.bilan["reecrites"] += 1
+                nouveau = self.ctx.store.get(dossier.id)
+                if nouveau.etape_attente in VALIDABLES:
+                    self.afficher("\nNouvelle version :")
+                    return self._dossier(nouveau, e)
+            return True
         if r in "vm":
             if r == "m":
                 d = dossier.documents
