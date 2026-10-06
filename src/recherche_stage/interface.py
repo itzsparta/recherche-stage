@@ -90,6 +90,7 @@ class Application:
                          "problemes": [{"gravite": p.gravite, "raison": p.raison} for p in d.critique.problemes]},
             "objet": doc.objet_mail, "mail": doc.mail, "lettre": doc.texte_lettre, "version": doc.version,
             "canal": d.envoi.canal, "destinataire": d.envoi.destinataire,
+            "presentiel": d.presentiel.model_dump() if d.presentiel and d.presentiel.conseille else None,
             "faits": [{"texte": f.texte, "source": f.source} for f in d.fiche_entreprise.faits],
             "recherche": f"https://duckduckgo.com/?q={quote_plus(o.entreprise + ' recrutement stage candidature')}",
         }

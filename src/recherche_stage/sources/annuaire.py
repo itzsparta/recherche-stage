@@ -31,6 +31,13 @@ def tranches_depuis(effectif_min: int) -> list[str]:
     return [code for code, borne in TRANCHES.items() if borne >= effectif_min] if effectif_min > 0 else []
 
 
+def _nombre(valeur) -> float | None:
+    try:
+        return float(valeur)
+    except (TypeError, ValueError):
+        return None
+
+
 def _etablissement(r: dict, departement: str | None) -> dict:
     """L'établissement du département cherché plutôt que le siège : l'agence
     lilloise d'un groupe parisien est bien dans la zone."""
@@ -78,6 +85,10 @@ class SourceAnnuaire:
             type="spontanee",
             secteur=r.get("activite_principale"),
             url=f"https://annuaire-entreprises.data.gouv.fr/entreprise/{r.get('siren', '')}",
+            adresse=lieu.get("adresse") or "",
+            latitude=_nombre(lieu.get("latitude")),
+            longitude=_nombre(lieu.get("longitude")),
+            tranche_effectif=r.get("tranche_effectif_salarie"),
         )
 
     def collecter(self, grille: GrilleCriteres, limite: int) -> list[Offre]:

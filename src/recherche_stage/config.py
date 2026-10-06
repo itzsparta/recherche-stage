@@ -130,6 +130,15 @@ class ParamsSuivi(BaseModel):
     excel_feuille: str | None = None  # par défaut : la première feuille
 
 
+class ParamsPresentiel(BaseModel):
+    """Signale (interface, tableau Excel) les candidatures spontanées qu'il vaut
+    la peine de déposer en main propre : petite entreprise proche de chez soi."""
+    actif: bool = True
+    domicile: str | None = None  # adresse ou ville de départ ; par défaut, la ville du CV
+    distance_max_km: float = 30
+    effectif_max: int = 250  # au-delà, le recrutement est rarement décidé sur place
+
+
 class EntrepriseATS(BaseModel):
     """Un site carrière. Donner soit `url` (page carrière hébergée par l'ATS),
     soit `ats` + `identifiant`."""
@@ -196,6 +205,7 @@ class Config(BaseModel):
     critique: ParamsCritique = Field(default_factory=ParamsCritique)
     envoi: ParamsEnvoi = Field(default_factory=ParamsEnvoi)
     suivi: ParamsSuivi = Field(default_factory=ParamsSuivi)
+    presentiel: ParamsPresentiel = Field(default_factory=ParamsPresentiel)
     sources: ParamsSources = Field(default_factory=ParamsSources)
     conservation_mois: int = 12
 

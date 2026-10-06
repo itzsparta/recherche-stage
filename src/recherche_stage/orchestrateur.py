@@ -207,8 +207,43 @@ class Orchestrateur:
 
         self._bilan_si_du(rapport)
 
+    def evaluer_presentiel(self) -> int:
+        """Juge, pour les candidatures prêtes à partir, si un dépôt en main propre
+        vaut la peine. Renvoie le nombre de dépôts conseillés parmi les nouvelles évaluations."""
+        params = self.ctx.config.presentiel
+        if not params.actif:
+            return 0
+        from .excel import a_exporter
+        from .presentiel import evaluer, geocoder
+
+        a_juger = [d for d in self.store.lister() if d.presentiel is None and a_exporter(d)]
+        if not a_juger:
+            return 0
+        depart = params.domicile or self.ctx.profil().identite.ville
+        domicile = geocoder(self.ctx.http, self.store, depart) if depart else None
+        if domicile is None:
+            self.progres("Dépôt en présentiel non évalué : indiquer presentiel.domicile dans config.yaml")
+            return 0
+        conseilles = 0
+        for d in a_juger:
+            o = d.offre
+            point = (o.latitude, o.longitude) if o.latitude is not None and o.longitude is not None else None
+            if point is None and o.type == "spontanee":
+                point = geocoder(self.ctx.http, self.store, o.adresse or o.lieu)
+            d.presentiel = evaluer(d, domicile, point, params)
+            if d.presentiel.raison == "distance inconnue":
+                d.presentiel = None  # réessayé au prochain passage (réseau)
+                continue
+            conseilles += d.presentiel.conseille
+            self.store.save(d)
+        return conseilles
+
     def mettre_a_jour_excel(self) -> str:
         """Reporte les candidatures dans le tableau Excel de l'utilisateur, s'il en a un."""
+        try:
+            self.evaluer_presentiel()
+        except Exception as e:  # noqa: BLE001 — un bonus : ne doit jamais empêcher la mise à jour
+            self.store.journaliser(self.nom, "presentiel_erreur", details={"erreur": str(e)})
         chemin = self.ctx.config.suivi.excel
         if not chemin:
             return ""

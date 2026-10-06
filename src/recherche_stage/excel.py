@@ -23,6 +23,7 @@ from pathlib import Path
 
 from .hachage import id_dossier
 from .modeles import Dossier, Statut
+from .presentiel import texte_excel
 
 # Champ → intitulés de colonne reconnus (après normalisation : minuscules,
 # sans accents ni ponctuation). Le premier intitulé égal gagne, puis le plus
@@ -44,6 +45,8 @@ COLONNES: dict[str, tuple[str, ...]] = {
     "date_reponse": ("date reponse", "date de reponse", "date retour", "reponse le"),
     "entretien": ("entretien", "date entretien", "date d entretien"),
     "score": ("score", "pertinence", "note", "interet"),
+    "presentiel": ("presentiel", "depot en presentiel", "depot sur place", "sur place", "en personne", "main propre",
+                   "deposer sur place", "a deposer sur place", "en main propre"),
     "remarques": ("remarques", "remarque", "commentaires", "commentaire", "notes", "observations", "infos"),
 }
 
@@ -73,7 +76,11 @@ LIBELLES_REPONSE = {"refus": "Refus", "entretien": "Entretien", "demande_info": 
 
 # Décrivent la candidature : sur une ligne existante, complétés seulement s'ils sont vides
 # (l'utilisateur a pu écrire le nom à sa façon). Les autres suivent l'avancement.
-DESCRIPTIFS = {"entreprise", "poste", "lieu", "secteur", "type", "contact", "lien", "score", "remarques"}
+DESCRIPTIFS = {"entreprise", "poste", "lieu", "secteur", "type", "contact", "lien", "score", "remarques", "presentiel"}
+
+# Colonnes ajoutées au tableau quand elles y manquent et qu'il y a quelque chose à y mettre.
+AJOUTABLES = {"presentiel": "Dépôt en présentiel"}
+VERT = {"fill": "C6EFCE", "police": "006100"}  # style « Bon » d'Excel
 
 
 class ErreurExcel(Exception):
@@ -167,7 +174,43 @@ def valeurs(d: Dossier) -> dict[str, object]:
         "entretien": d.suivi.entretien_le if d.suivi.entretien_le else None,
         "score": round(d.score.valeur) if d.score.valeur else None,
         "remarques": d.envoi.preuve if d.envoi.canal != "email" else "",
+        "presentiel": texte_excel(d.presentiel),
     }
+
+
+def _ajouter_colonne(ws, ligne_entete: int, intitule: str) -> int:
+    """Ajoute une colonne après la dernière colonne titrée, dans le style de l'en-tête
+    voisin, et l'intègre au tableau Excel mis en forme qui s'arrêtait juste avant."""
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.table import TableColumn
+
+    derniere = max((c.column for c in ws[ligne_entete] if c.value not in (None, "")), default=0)
+    col = derniere + 1
+    cellule = ws.cell(ligne_entete, col, intitule)
+    if derniere and ws.cell(ligne_entete, derniere).has_style:
+        cellule._style = copy(ws.cell(ligne_entete, derniere)._style)
+    lettre = get_column_letter(col)
+    precedente = get_column_letter(derniere) if derniere else None
+    if precedente and ws.column_dimensions[precedente].width:
+        ws.column_dimensions[lettre].width = max(ws.column_dimensions[precedente].width, 28)
+    else:
+        ws.column_dimensions[lettre].width = 40
+    for table in ws.tables.values():
+        debut, fin = table.ref.split(":")
+        if re.match(r"[A-Z]+", fin).group(0) == precedente and int(re.search(r"\d+", debut).group(0)) == ligne_entete:
+            fin_ligne = re.search(r"\d+", fin).group(0)
+            table.ref = f"{debut}:{lettre}{fin_ligne}"
+            table.tableColumns.append(TableColumn(id=len(table.tableColumns) + 1, name=intitule))
+            if table.autoFilter is not None:
+                table.autoFilter.ref = table.ref
+    return col
+
+
+def _surligner(cellule) -> None:
+    from openpyxl.styles import Font, PatternFill
+
+    cellule.fill = PatternFill("solid", start_color=VERT["fill"], end_color=VERT["fill"])
+    cellule.font = Font(color=VERT["police"], bold=True)
 
 
 def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | None = None) -> tuple[int, int]:
@@ -187,6 +230,10 @@ def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | No
     classeur = load_workbook(chemin)
     ws = classeur[feuille] if feuille else classeur.worksheets[0]
     ligne_entete, colonnes = _ligne_entete(ws)
+    a_ecrire = [d for d in dossiers if a_exporter(d)]
+    for champ, intitule in AJOUTABLES.items():
+        if champ not in colonnes and any(valeurs(d)[champ] for d in a_ecrire):
+            colonnes[champ] = _ajouter_colonne(ws, ligne_entete, intitule)
 
     def cle(entreprise, poste) -> str:
         return id_dossier(str(entreprise or ""), str(poste or "")) if "poste" in colonnes else _norm(entreprise)
@@ -232,6 +279,8 @@ def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | No
             if valeur in (None, ""):
                 continue  # une case déjà remplie à la main n'est pas vidée
             cellule.value = valeur
+            if champ == "presentiel":
+                _surligner(cellule)
             if isinstance(valeur, (date, datetime)) and cellule.number_format == "General":
                 cellule.number_format = "DD/MM/YYYY HH:MM" if isinstance(valeur, datetime) else "DD/MM/YYYY"
 

@@ -64,6 +64,11 @@ class Offre(BaseModel):
     date_publication: date | None = None
     sources_fusionnees: list[str] = Field(default_factory=list)
     collecteur: str = ""  # source de l'agent Veille qui l'a collectée (bandit)
+    # Établissement visé (annuaire) : sert à juger un dépôt en présentiel.
+    adresse: str = ""
+    latitude: float | None = None
+    longitude: float | None = None
+    tranche_effectif: str | None = None  # code INSEE
 
 
 # --------------------------------------------------------------------------
@@ -169,6 +174,14 @@ class EntreeHistorique(BaseModel):
     entrees_hash: str = ""
 
 
+class Presentiel(BaseModel):
+    """Vaut-il la peine d'apporter la candidature en main propre ?"""
+    conseille: bool = False
+    distance_km: float | None = None
+    raison: str = ""
+    adresse: str = ""
+
+
 class Dossier(BaseModel):
     id: str
     statut: Statut = Statut.collectee
@@ -188,6 +201,7 @@ class Dossier(BaseModel):
     etape_attente: str = ""  # étape bloquée sur l'humain : scoring, enquete, critique, envoi, suivi
     valide_humain: list[str] = Field(default_factory=list)  # étapes débloquées par l'humain
     consigne_humain: str = ""  # demande de l'humain pour la dernière réécriture
+    presentiel: Presentiel | None = None  # None : pas encore évalué
 
     def tracer(self, agent: str, action: str, entrees_hash: str = "") -> None:
         self.historique.append(EntreeHistorique(agent=agent, action=action, entrees_hash=entrees_hash))

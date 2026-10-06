@@ -132,6 +132,8 @@ rs consignes "Parcours académique d'abord"  # préférences de rédaction pour 
                                           # carte, « Réécrire… » avec une consigne propre à cette candidature)
 rs excel                                  # met à jour ton tableau Excel de suivi (suivi.excel), fait aussi
                                           # après chaque cycle, validation, dépôt ou réponse
+                                          # + colonne « Dépôt en présentiel » : en vert, les spontanées
+                                          # qu'il vaut la peine d'apporter en main propre (presentiel.*)
 rs file                                   # ce qui attend une décision
 rs voir <id>                              # documents, note du Critique, problèmes relevés
 rs valider <id>                           # ou : éditer mail_vN.txt / lettre_vN.txt, puis rs valider <id> --modifie

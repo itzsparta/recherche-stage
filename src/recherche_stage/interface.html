@@ -207,6 +207,8 @@ function creerCarte(e) {
   if (d.critique.iteration) badges.push(el("span", { class: "badge " + (d.critique.note >= 80 ? "ok" : "avert") }, `relecture ${Math.round(d.critique.note)}/100`));
   if (d.canal === "email") badges.push(el("span", { class: "badge ok" }, `mail → ${d.destinataire}`));
   else if (d.canal) badges.push(el("span", { class: "badge avert" }, "dépôt à la main"));
+  if (d.presentiel) badges.push(el("span", { class: "badge ok", title: `${d.presentiel.raison}${d.presentiel.adresse ? " — " + d.presentiel.adresse : ""}` },
+    `à déposer sur place · ${Math.round(d.presentiel.distance_km)} km`));
 
   carte.append(el("div", { class: "entete" },
     el("div", {}, el("h3", {}, d.entreprise), el("div", { class: "sous" }, `${d.intitule} · ${d.lieu}`)),
@@ -238,6 +240,10 @@ function creerCarte(e) {
       "Aucune adresse mail publique : dépose le CV et la lettre (PDF dans le dossier) sur le site de l'entreprise. ",
       el("a", { href: d.recherche, target: "_blank", rel: "noreferrer" }, "Chercher sa page carrières ↗")));
   }
+  if (d.presentiel)
+    carte.append(el("div", { class: "depot" }, `À déposer en main propre (${d.presentiel.raison})`,
+      d.presentiel.adresse ? el("span", {}, " : ", el("a", { href: "https://www.openstreetmap.org/search?query=" + encodeURIComponent(d.presentiel.adresse),
+        target: "_blank", rel: "noreferrer" }, d.presentiel.adresse + " ↗")) : ""));
 
   const actions = el("div", { class: "actions" });
   const bouton = (texte, classe, fn) => el("button", { class: classe, onclick: fn }, texte);
