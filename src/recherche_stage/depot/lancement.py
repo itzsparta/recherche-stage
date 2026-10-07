@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -21,6 +23,31 @@ EN_COURS = ("ouverture", "rempli", "connexion", "captcha", "manque")
 def _nom(navigateur: str) -> str:
     """« brave » pour « brave » comme pour un chemin Windows « …\\brave.exe »."""
     return re.sub(r"\.exe$", "", re.split(r"[\\/]", navigateur)[-1], flags=re.IGNORECASE)
+
+
+def chemins_brave() -> list[str]:
+    """Emplacements habituels de Brave (Windows, macOS, Linux)."""
+    chemins = []
+    for variable in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+        base = os.environ.get(variable)
+        if base:
+            chemins.append(os.path.join(base, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"))
+    chemins.append("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser")
+    chemins += [c for c in (shutil.which("brave-browser"), shutil.which("brave")) if c]
+    return chemins
+
+
+def brave() -> str | None:
+    return next((c for c in chemins_brave() if os.path.isfile(c)), None)
+
+
+def choisi(navigateur: str | None) -> str:
+    """Navigateur réellement utilisé : celui des Réglages, sinon Brave s'il est
+    installé, sinon « » (Edge, puis Chrome)."""
+    navigateur = (navigateur or "").strip()
+    if navigateur:
+        return navigateur
+    return "brave" if brave() else ""
 
 
 def nom_profil(navigateur: str | None) -> str:
@@ -66,6 +93,7 @@ def preparer(ctx: Contexte, dossier: Dossier, pieces: list[Path]) -> Path:
     etat.write_text(json.dumps({"etat": "ouverture", "message": "Ouverture du navigateur…", "url": dossier.fiche_entreprise.page_carriere,
                                 "remplis": [], "manquants": []}, ensure_ascii=False), encoding="utf-8")
     tache = fichiers / "depot_tache.json"
+    navigateur = choisi(ctx.config.depot.navigateur)
     tache.write_text(json.dumps({
         "url": dossier.fiche_entreprise.page_carriere,
         "valeurs": valeurs(ctx, dossier),
@@ -73,8 +101,8 @@ def preparer(ctx: Contexte, dossier: Dossier, pieces: list[Path]) -> Path:
         "questions": dossier.documents.reponses_formulaire,
         "etat": str(etat),
         # Un profil par navigateur (deux navigateurs ne partagent pas un même profil) ; les sessions y restent.
-        "profil_navigateur": str(ctx.config.dossier_donnees / "navigateur" / nom_profil(ctx.config.depot.navigateur)),
-        "navigateur": ctx.config.depot.navigateur or "",
+        "profil_navigateur": str(ctx.config.dossier_donnees / "navigateur" / nom_profil(navigateur)),
+        "navigateur": navigateur,
     }, ensure_ascii=False), encoding="utf-8")
     return tache
 

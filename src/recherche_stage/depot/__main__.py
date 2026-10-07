@@ -7,24 +7,12 @@ import json
 import sys
 from pathlib import Path
 
+import os
+
+from .lancement import chemins_brave
 from .remplisseur import Etat, Remplisseur, deposer
 
-import os
-import shutil
-
 CANAUX = {"edge": "msedge", "msedge": "msedge", "chrome": "chrome"}
-
-
-def chemins_brave() -> list[str]:
-    """Emplacements habituels de Brave (Windows, macOS, Linux)."""
-    chemins = []
-    for variable in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
-        base = os.environ.get(variable)
-        if base:
-            chemins.append(os.path.join(base, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"))
-    chemins.append("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser")
-    chemins += [c for c in (shutil.which("brave-browser"), shutil.which("brave")) if c]
-    return chemins
 
 
 def candidats(choix: str) -> list[dict]:
@@ -50,9 +38,12 @@ def ouvrir_navigateur(playwright, profil: str, choix: str = ""):
     for bac_a_sable in (True, False):  # le bac à sable évite l'avertissement --no-sandbox ; repli si refusé
         for options in candidats(choix):
             try:
+                # Sans le drapeau « logiciel de test automatisé » : c'est ta fenêtre, et ce drapeau
+                # fait afficher des CAPTCHA à chaque page. Les CAPTCHA restent à toi de les résoudre.
                 return playwright.chromium.launch_persistent_context(
-                    profil, headless=False, chromium_sandbox=bac_a_sable, accept_downloads=False,
-                    no_viewport=True, args=["--start-maximized"], **options)
+                    profil, headless=False, chromium_sandbox=bac_a_sable, accept_downloads=False, no_viewport=True,
+                    ignore_default_args=["--enable-automation"],
+                    args=["--start-maximized", "--disable-blink-features=AutomationControlled"], **options)
             except Exception as e:  # navigateur absent : on essaie le suivant
                 erreur = e
     raise RuntimeError(f"Impossible d'ouvrir le navigateur ({choix or 'Edge, Chrome ou Chromium'}) : {erreur}")

@@ -102,10 +102,14 @@ def _question(texte: str, questions: dict[str, str]) -> str | None:
     return meilleure if score >= 0.6 else None
 
 
+def cadre_captcha(url: str) -> bool:
+    return bool(re.search(r"recaptcha|hcaptcha|turnstile|captcha|challenges\.cloudflare", url or ""))
+
+
 def blocage(champs: list[dict], cadres: list[str]) -> str | None:
     """« captcha » si un CAPTCHA est affiché, « connexion » si la page demande un
     mot de passe : la main revient à l'utilisateur."""
-    if any(re.search(r"recaptcha|hcaptcha|turnstile|captcha", c) for c in cadres):
+    if any(cadre_captcha(c) for c in cadres):
         return "captcha"
     if any((c.get("type") or "").lower() == "password" and c.get("visible") for c in champs):
         return "connexion"

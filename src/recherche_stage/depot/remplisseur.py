@@ -121,6 +121,8 @@ class Remplisseur:
         cadres = [f.url for f in page.frames]
         collectes = []
         for cadre in page.frames:
+            if reco.cadre_captcha(cadre.url):  # on ne touche jamais au CAPTCHA : c'est à toi
+                continue
             try:
                 collectes.append((cadre, cadre.evaluate(COLLECTE)))
             except Exception:  # cadre détaché ou d'une autre origine bloquée : on passe

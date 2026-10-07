@@ -30,7 +30,7 @@ CHAMPS: dict[tuple[str, str], tuple[str, str, str]] = {
     ("presentiel", "distance_max_km"): ("Distance maximale pour un dépôt sur place (km)", "nombre", ""),
     ("presentiel", "effectif_max"): ("Effectif maximal pour un dépôt sur place", "entier", ""),
     ("depot", "navigateur"): ("Navigateur pour « Remplir pour moi »", "texte",
-                              "brave, edge ou chrome, ou chemin complet du .exe ; vide : Edge"),
+                              "brave, edge ou chrome, ou chemin complet du .exe ; vide : Brave s'il est installé, sinon Edge"),
     ("suivi", "excel"): ("Tableau Excel de suivi", "texte", "Chemin complet du fichier .xlsx ; vide : aucun"),
 }
 

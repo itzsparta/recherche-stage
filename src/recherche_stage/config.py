@@ -141,7 +141,7 @@ class ParamsPresentiel(BaseModel):
 
 class ParamsDepot(BaseModel):
     """« Remplir pour moi » sur les sites carrière."""
-    # brave, edge ou chrome, ou le chemin complet de l'exécutable ; vide : Edge, sinon Chrome.
+    # brave, edge ou chrome, ou le chemin complet de l'exécutable ; vide : Brave s'il est installé, sinon Edge, sinon Chrome.
     navigateur: str | None = None
 
 

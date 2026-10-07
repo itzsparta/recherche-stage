@@ -307,4 +307,8 @@ def test_choix_du_navigateur(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="inconnu"):
         principal.candidats("firefox")
     assert lancement.nom_profil("brave") == "brave" and lancement.nom_profil(None) == "edge"
+    # Rien dans les Réglages : Brave s'il est installé, sinon Edge.
+    assert lancement.choisi("") == "brave" and lancement.choisi(" chrome ") == "chrome"
+    monkeypatch.setattr(lancement, "chemins_brave", lambda: [])
+    assert lancement.choisi(None) == "" and lancement.libelle_navigateur("") == "Edge, sinon Chrome"
     assert lancement.nom_profil(r"C:\Program Files\BraveSoftware\brave.exe") == "brave"

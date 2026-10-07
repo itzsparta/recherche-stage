@@ -167,8 +167,11 @@ Quand aucune adresse mail publique n'existe, la carte propose « Remplir pour mo
    si la recherche l'a réellement consultée ; sinon, rien n'est inventé et le lien de
    recherche reste proposé).
 2. Le navigateur s'ouvre (Playwright, `pip install playwright` ou `pip install -e ".[depot]"`).
-   Edge par défaut, déjà installé sous Windows ; Brave ou Chrome au choix dans
-   Réglages (`depot.navigateur: brave`), rien d'autre à télécharger. Il refuse le
+   Brave s'il est installé, sinon Edge (déjà là sous Windows) ; un autre au choix dans
+   Réglages (`depot.navigateur: chrome`, ou le chemin du .exe), rien d'autre à télécharger.
+   La fenêtre n'est pas signalée comme « logiciel de test automatisé » (ce signal fait
+   apparaître des CAPTCHA partout) ; un CAPTCHA qui s'affiche quand même reste à
+   résoudre par toi, le programme n'y touche pas. Il refuse le
    bandeau de cookies, descend dans la page et suit « Carrières », « Nous rejoindre »,
    puis « Candidature spontanée » ou « Postuler » (jamais un bouton d'envoi, jamais
    un site d'offres), puis remplit prénom, nom, mail,
