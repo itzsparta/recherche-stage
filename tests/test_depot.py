@@ -12,6 +12,7 @@ from test_interface import app, carte  # noqa: F401  (fixture)
 from test_revue import orchestrateur, par_entreprise  # noqa: F401  (fixture)
 
 from recherche_stage.depot import champs as reco
+from recherche_stage.depot import lancement
 from recherche_stage.depot.remplisseur import Remplisseur, deposer
 from recherche_stage.interface import Refus
 
@@ -59,7 +60,20 @@ def test_questions_ouvertes_et_confirmation():
 # ------------------------------------------------------- orchestrateur, interface
 
 
-def test_remplir_trouve_la_page_reserve_et_lance_le_navigateur(app, ctx, orchestrateur):  # noqa: F811
+@pytest.fixture
+def playwright_present(monkeypatch):
+    monkeypatch.setattr(lancement, "disponible", lambda: True)  # le navigateur lui-même est remplacé
+
+
+def test_sans_playwright_le_bouton_explique_quoi_installer(app, monkeypatch):  # noqa: F811
+    d = carte(app, "Sans Adresse")["dossier"]
+    app.action({"action": "valider", "dossier": d["id"]})
+    monkeypatch.setattr(lancement, "disponible", lambda: False)
+    with pytest.raises(Refus, match="pip install playwright"):
+        app.action({"action": "remplir", "dossier": d["id"]})
+
+
+def test_remplir_trouve_la_page_reserve_et_lance_le_navigateur(app, ctx, orchestrateur, playwright_present):  # noqa: F811
     d = carte(app, "Sans Adresse")["dossier"]
     app.action({"action": "valider", "dossier": d["id"]})
     assert carte(app, "Sans Adresse")["actions"][0] == "remplir"
@@ -85,7 +99,7 @@ def test_remplir_trouve_la_page_reserve_et_lance_le_navigateur(app, ctx, orchest
         app.action({"action": "remplir", "dossier": d["id"]})
 
 
-def test_page_introuvable_rien_n_est_invente(app, ctx, orchestrateur):  # noqa: F811
+def test_page_introuvable_rien_n_est_invente(app, ctx, orchestrateur, playwright_present):  # noqa: F811
     d = carte(app, "Sans Adresse")["dossier"]
     app.action({"action": "valider", "dossier": d["id"]})
     ctx.llm.recherche = ("Rien de fiable.", ["https://autre.example/"])
