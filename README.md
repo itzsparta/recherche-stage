@@ -179,9 +179,11 @@ Quand aucune adresse mail publique n'existe, la carte propose « Remplir pour mo
    Les champs remplis sont entourés en vert, ceux à compléter en rouge.
 3. Il s'arrête là : **c'est toi qui relis, coches les consentements et cliques sur
    Envoyer.** Jamais de clic d'envoi automatique, ni de CAPTCHA contourné.
-4. Si le site demande un compte, tu te connectes ou le crées toi-même dans la fenêtre
-   (tu choisis le mot de passe, l'outil ne le voit pas) ; le remplissage reprend sur la
-   page suivante. Les sessions restent dans `donnees/navigateur/<navigateur>`, un profil
+4. Si le site demande un compte, la première fois il ouvre « Créer un compte » et remplit
+   le formulaire d'inscription, sauf le mot de passe et les conditions : tu les choisis
+   et valides la création toi-même (l'outil ne voit pas le mot de passe). Les fois
+   suivantes sur ce site, tu te connectes ; le remplissage reprend sur la page suivante.
+   Seuls le nom du site et la date sont notés (`donnees/navigateur/comptes.json`). Les sessions restent dans `donnees/navigateur/<navigateur>`, un profil
    à part de ton profil habituel.
 5. La carte affiche l'avancement. À la page « Merci pour votre candidature », clique
    « C'est déposé » : le suivi et les relances démarrent.
