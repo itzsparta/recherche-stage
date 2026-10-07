@@ -126,4 +126,8 @@ def derniere_ligne_journal(ctx: Contexte, dossier_id: str) -> str:
 def lancer(tache: Path) -> subprocess.Popen:
     # Sortie du processus gardée dans le dossier : en cas d'échec, l'interface en montre la dernière ligne.
     journal = open(tache.parent / FICHIER_JOURNAL, "w", encoding="utf-8")  # noqa: SIM115 (fermé avec le processus)
-    return subprocess.Popen([sys.executable, "-m", "recherche_stage.depot", str(tache)], stdout=journal, stderr=subprocess.STDOUT)
+    # Textes de liens avec accents ou symboles, sous Windows aussi ; le navigateur n'a pas besoin des clés d'API.
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    env["PYTHONIOENCODING"] = "utf-8"
+    return subprocess.Popen([sys.executable, "-m", "recherche_stage.depot", str(tache)], stdout=journal, stderr=subprocess.STDOUT,
+                            env=env)

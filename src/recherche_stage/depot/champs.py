@@ -49,6 +49,7 @@ CREER_COMPTE = re.compile(r"cree[rz]? (un |mon |votre |ton )?(compte|profil)|ins
 VERS_CARRIERES = re.compile(r"nous rejoindre|rejoignez|rejoindre|carrieres?\b|careers?\b|recrutement|recrute|travailler (chez|avec)"
                             r"|join us|talents?\b|offres? d.emploi|nos offres|emplois?\b|\bjobs?\b|espace candidat")
 ADRESSE_CARRIERES = re.compile(r"carriere|career|recrut|rejoindre|rejoignez|join|jobs?\b|emploi|candidat|talent")
+ESPACE_CANDIDAT = re.compile(r"candidat|candidature|postul|recrutement|emploi|carriere|career|\bapply\b|job")
 # Refus des cookies (texte normalisé ; motif compatible JavaScript, il sert aussi dans la page).
 REFUS_COOKIES = re.compile(r"^(tout refuser|refuser( tout| tous les cookies| les cookies| et fermer)?|je refuse|tout rejeter"
                            r"|rejeter( tout| tous les cookies)?|non merci|reject( all)?|decline( all)?|deny( all)?|refuse all"
@@ -161,6 +162,8 @@ def choisir_lien(liens: list[dict], deja: set[str]) -> dict | None:
             r = 2
         else:
             continue
+        if not lien.get("visible", True):
+            r += 0.5  # caché dans un menu : après un lien visible de même sorte
         if r < rang:
             meilleur, rang = lien, r
     return meilleur

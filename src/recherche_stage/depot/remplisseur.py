@@ -62,12 +62,13 @@ LIENS = r"""
   // Formulaire « à remplir » : un bouton qui s'y trouve pourrait l'envoyer.
   const aRemplir = f => !!f && [...f.querySelectorAll("input, textarea")].some(c =>
     !["hidden", "submit", "button", "image", "reset", "checkbox", "radio", "search"].includes((c.getAttribute("type") || "").toLowerCase()) && visible(c));
-  return [...document.querySelectorAll("a, button, [role=button], [role=link]")].filter(visible).map((e, i) => {
+  // Les liens cachés dans un menu replié (« Nous rejoindre » sous « Carrières ») comptent aussi : on ira à leur adresse.
+  const lien = e => e.tagName === "A" && (e.getAttribute("href") || "").trim() && !/^(#|javascript:)/i.test(e.getAttribute("href").trim());
+  return [...document.querySelectorAll("a, button, [role=button], [role=link]")].filter(e => visible(e) || lien(e)).map((e, i) => {
     e.dataset.rsLien = String(i);
     const f = e.closest("form");
-    return { i: String(i), texte: (e.innerText || e.getAttribute("aria-label") || e.title || "").trim().slice(0, 80),
-             href: e.tagName === "A" && e.getAttribute("href") ? e.href : "",
-             formulaire: aRemplir(f), envoi: !!f && e.type === "submit" };
+    return { i: String(i), texte: (e.innerText || e.textContent || e.getAttribute("aria-label") || e.title || "").trim().replace(/\s+/g, " ").slice(0, 80),
+             href: lien(e) ? e.href : "", visible: visible(e), formulaire: aRemplir(f), envoi: !!f && e.type === "submit" };
   });
 }
 """
@@ -143,6 +144,8 @@ class Remplisseur:
         self.cookies: dict[str, int] = {}  # page -> essais de refus du bandeau (3 au plus)
         self.navigation: list[str] = []  # liens suivis, pour le compte rendu
         self.formulaire = False  # la dernière passe a vu un formulaire à remplir
+        self.inscriptions: set[str] = set()  # sites où « Créer un compte » a été ouvert pendant ce dépôt
+        self.derniere_url = ""
         # Sites où « Créer un compte » a déjà été ouvert (nom du site et date, rien d'autre) :
         # la fois suivante, c'est à toi de te connecter.
         self.fichier_comptes = fichier_comptes
@@ -173,7 +176,14 @@ class Remplisseur:
                 continue
         for _, liste in collectes:
             tous += liste
-        self.formulaire = self.est_formulaire(tous)
+        if page.url != self.derniere_url:
+            self.derniere_url = page.url
+            journal(f"page : {page.url}")
+        # Création de compte (mot de passe + confirmation) : on remplit ce qu'on connaît, jamais le mot de passe.
+        mots_de_passe = sum(1 for c in tous if c["type"] == "password" and c["visible"])
+        self.formulaire = mots_de_passe >= 2 or self.est_formulaire(tous)
+        if self.formulaire and mots_de_passe:
+            self._noter_compte(page.url)
         if self.formulaire:
             for cadre, liste in collectes:
                 self._remplir_cadre(cadre, liste, manquants)
@@ -260,22 +270,33 @@ class Remplisseur:
         descend dans la page, puis suit « Candidature spontanée » / « Postuler »,
         ou à défaut « Carrières » / « Nous rejoindre » (six liens au plus en tout).
         Jamais un bouton d'envoi."""
-        if self.clics >= 6:
+        if self.clics >= 8:
             return False
         self.refuser_cookies(page)
-        lien = reco.choisir_lien(self._liens(page), self.suivis)
+        self.suivis.add(page.url.lower())  # « Carrières » qui renvoie sur la page où l'on est déjà
+        liens = self._liens(page)
+        lien = reco.choisir_lien(liens, self.suivis)
         if lien is None:  # liens du bas de page parfois chargés au défilement
             try:
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 page.wait_for_timeout(1200)
             except Exception:
                 return False
-            lien = reco.choisir_lien(self._liens(page), self.suivis)
-        if lien is None:
+            liens = self._liens(page)
+            lien = reco.choisir_lien(liens, self.suivis)
+        if lien is None:  # page « Se connecter / Créer un compte » d'un espace candidat (pas l'espace client du site)
+            try:
+                texte = reco.normaliser(page.inner_text("body", timeout=2000))
+            except Exception:
+                texte = ""
+            if reco.ESPACE_CANDIDAT.search(texte):
+                return self.vers_inscription(page, liens)
+            journal(f"aucun lien utile sur cette page ; liens vus : {[x['texte'] for x in liens if x['texte']][:25]}")
             return False
         self.suivis.add((lien.get("href") or reco.normaliser(lien["texte"])).lower())
         self.clics += 1
         self.navigation.append(lien["texte"] or lien.get("href", ""))
+        journal(f"lien suivi : « {lien['texte']} » {lien.get('href', '')}")
         return self._cliquer(page, lien)
 
     def refuser_cookies(self, page) -> bool:
@@ -293,30 +314,42 @@ class Remplisseur:
             except Exception:
                 continue
             if clic:
+                journal(f"cookies refusés ({clic})")
                 self.cookies[page.url] = 3
                 _attendre(page, 600)
                 return True
         return False
 
-    def vers_inscription(self, page) -> bool:
+    def vers_inscription(self, page, liens: list[dict] | None = None) -> bool:
         """Page de connexion : ouvre « Créer un compte » pour que le formulaire
         d'inscription soit rempli (sauf le mot de passe, toujours choisi par toi).
-        Une seule fois par site : la fois suivante, tu te connectes."""
+        Pas sur un site où un compte a déjà été créé : là, tu te connectes."""
         hote = urlsplit(page.url).hostname or ""
-        if self.formulaire or not hote or hote in self.comptes or self.clics >= 8:
+        if self.formulaire or not hote or hote in self.comptes or hote in self.inscriptions or self.clics >= 10:
             return False
-        lien = reco.choisir_inscription(self._liens(page))
+        lien = reco.choisir_inscription(liens if liens is not None else self._liens(page))
         if lien is None:
+            textes = [x["texte"] for x in (liens or []) if x["texte"]][:25]
+            journal(f"aucun lien utile sur cette page ; liens vus : {textes}")
             return False
+        self.inscriptions.add(hote)
+        self.clics += 1
+        self.navigation.append(lien["texte"])
+        journal(f"création de compte : « {lien['texte']} »")
+        return self._cliquer(page, lien)
+
+    def _noter_compte(self, url: str) -> None:
+        """Formulaire d'inscription vu : la fois suivante sur ce site, on se connecte."""
+        hote = urlsplit(url).hostname or ""
+        if not hote or hote in self.comptes:
+            return
         self.comptes[hote] = datetime.now().strftime("%d/%m/%Y")
+        journal(f"formulaire de création de compte sur {hote}")
         if self.fichier_comptes:
             try:
                 Path(self.fichier_comptes).write_text(json.dumps(self.comptes, ensure_ascii=False), encoding="utf-8")
             except OSError:
                 pass
-        self.clics += 1
-        self.navigation.append(lien["texte"])
-        return self._cliquer(page, lien)
 
     @staticmethod
     def _liens(page) -> list[dict]:
@@ -329,6 +362,10 @@ class Remplisseur:
     def _cliquer(page, lien: dict, attendre: bool = True) -> bool:
         element = page.locator(f'[data-rs-lien="{lien["i"]}"]').first
         try:
+            if not lien.get("visible", True) and lien.get("href"):  # dans un menu replié : on va à son adresse
+                page.goto(lien["href"], wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(800)
+                return True
             try:
                 element.click(timeout=5000)
             except Exception:  # recouvert (bandeau, fenêtre surgissante) : clic direct sur le lien
@@ -339,6 +376,15 @@ class Remplisseur:
         except Exception:
             return False
         return True
+
+
+def journal(message: str) -> None:
+    """Ligne du journal du dépôt (depot_journal.txt) : adresses et textes des liens,
+    jamais les valeurs saisies."""
+    try:
+        print(f"{datetime.now():%H:%M:%S} {message}", flush=True)
+    except (OSError, ValueError):  # sortie fermée ou encodage : le journal ne doit jamais arrêter le dépôt
+        pass
 
 
 def bandeau(page, message: str) -> None:
@@ -385,6 +431,8 @@ def deposer(contexte, url: str, remplisseur: Remplisseur, chemin_etat: Path, dur
             confirme = etat
         signature = (etat.etat, etat.url, tuple(etat.remplis), tuple(etat.manquants))
         if signature != precedent:
+            if not precedent or etat.etat != precedent[0]:
+                journal(f"état : {etat.etat} — {etat.message}")
             etat.ecrire(chemin_etat)
             precedent = signature
         _attendre(page, 1500)

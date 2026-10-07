@@ -183,7 +183,7 @@ Quand aucune adresse mail publique n'existe, la carte propose « Remplir pour mo
    le formulaire d'inscription, sauf le mot de passe et les conditions : tu les choisis
    et valides la création toi-même (l'outil ne voit pas le mot de passe). Les fois
    suivantes sur ce site, tu te connectes ; le remplissage reprend sur la page suivante.
-   Seuls le nom du site et la date sont notés (`donnees/navigateur/comptes.json`). Les sessions restent dans `donnees/navigateur/<navigateur>`, un profil
+   Seuls le nom du site et la date sont notés (`donnees/navigateur/comptes_crees.json`). Les sessions restent dans `donnees/navigateur/<navigateur>`, un profil
    à part de ton profil habituel.
 5. La carte affiche l'avancement. À la page « Merci pour votre candidature », clique
    « C'est déposé » : le suivi et les relances démarrent.

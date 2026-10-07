@@ -14,4 +14,4 @@ SITES_TIERS = (
 
 def site_tiers(url: str) -> bool:
     hote = url.split("://", 1)[-1].split("/", 1)[0].lower()
-    return any(t in hote for t in SITES_TIERS)
+    return any(hote == t or hote.endswith("." + t) if t == "x.com" else t in hote for t in SITES_TIERS)

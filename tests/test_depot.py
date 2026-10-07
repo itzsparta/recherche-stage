@@ -190,6 +190,17 @@ INSCRIPTION = """<!doctype html><meta charset="utf-8"><form action="/merci.html"
 <label for="pw">Mot de passe</label><input id="pw" type="password" name="pw">
 <label><input type="checkbox" name="cgu"> J'accepte les conditions</label><button type="submit">Créer mon compte</button></form>"""
 
+# Menu replié (« Nous rejoindre » caché sous « Carrières »), page de choix sans mot de passe,
+# puis inscription « e-mail + mot de passe + confirmation » dont le bouton est un faux bouton (div).
+MENU = """<!doctype html><meta charset="utf-8"><nav><span>Carrières</span>
+<ul style="display:none"><li><a href="/choix.html">Nous rejoindre</a></li></ul></nav><p>Énergie</p>"""
+CHOIX = """<!doctype html><meta charset="utf-8"><h1>Postuler</h1>
+<button onclick="location='/connexion2.html'">Se connecter</button>
+<button onclick="location='/inscription2.html'">Créer un compte</button>"""
+INSCRIPTION2 = """<!doctype html><meta charset="utf-8"><label for="m">Adresse e-mail</label><input id="m" type="email">
+<label for="a">Mot de passe</label><input id="a" type="password"><label for="b">Vérifier le mot de passe</label><input id="b" type="password">
+<div role="button" aria-label="Créer un compte" onclick="location='/merci.html'">Créer un compte</div>"""
+
 
 @pytest.fixture(scope="module")
 def site(tmp_path_factory):
@@ -197,7 +208,8 @@ def site(tmp_path_factory):
     for nom, html in {"formulaire.html": FORMULAIRE, "carrieres.html": CARRIERES, "connexion.html": CONNEXION,
                       "merci.html": "<p>Merci pour votre candidature !</p>",
                       "accueil.html": ACCUEIL, "carrieres2.html": CARRIERES2, "rejoindre.html": REJOINDRE,
-                      "offre.html": OFFRE, "connexion2.html": CONNEXION2, "inscription.html": INSCRIPTION}.items():
+                      "offre.html": OFFRE, "connexion2.html": CONNEXION2, "inscription.html": INSCRIPTION,
+                      "menu.html": MENU, "choix.html": CHOIX, "inscription2.html": INSCRIPTION2}.items():
         (racine / nom).write_text(html, encoding="utf-8")
     class Silencieux(SimpleHTTPRequestHandler):
         def log_message(self, *args):
@@ -333,6 +345,21 @@ def test_cookies_postuler_puis_creation_de_compte(navigateur, site, remplisseur,
     page.goto(f"{site}/connexion2.html")
     etat = suivant.passe(page)
     assert "Compte commencé" in etat.message and not suivant.vers_inscription(page)
+
+
+def test_menu_replie_page_de_choix_et_inscription_a_double_mot_de_passe(navigateur, site, tmp_path):
+    r = Remplisseur({"email": "remi@example.org"}, {}, fichier_comptes=tmp_path / "comptes.json")
+    page = navigateur.new_page()
+    page.goto(f"{site}/menu.html")
+    assert r.passe(page).etat == "ouverture" and r.vers_formulaire(page)
+    assert page.url.endswith("/choix.html")  # lien caché du menu : suivi par son adresse
+    assert r.passe(page).etat == "ouverture" and r.vers_formulaire(page)
+    assert page.url.endswith("/inscription2.html")  # « Créer un compte », pas « Se connecter »
+    etat = r.passe(page)
+    assert etat.etat == "connexion" and page.input_value("#m") == "remi@example.org" and page.input_value("#a") == ""
+    assert not r.vers_formulaire(page) and not r.vers_inscription(page)
+    assert page.url.endswith("/inscription2.html")  # le faux bouton « Créer un compte » n'est jamais cliqué
+    assert "127.0.0.1" in json.loads((tmp_path / "comptes.json").read_text(encoding="utf-8"))
 
 
 def test_choix_des_liens():
