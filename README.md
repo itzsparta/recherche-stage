@@ -166,16 +166,20 @@ Quand aucune adresse mail publique n'existe, la carte propose « Remplir pour mo
 1. L'Enquête trouve la page carrières ou le formulaire de candidature (gardée seulement
    si la recherche l'a réellement consultée ; sinon, rien n'est inventé et le lien de
    recherche reste proposé).
-2. Edge s'ouvre (Playwright, `pip install playwright` ou `pip install -e ".[depot]"` ;
-   Edge est déjà installé sous Windows, rien d'autre à télécharger). Il suit le lien
-   « Candidature spontanée » ou « Postuler » si besoin, remplit prénom, nom, mail,
+2. Le navigateur s'ouvre (Playwright, `pip install playwright` ou `pip install -e ".[depot]"`).
+   Edge par défaut, déjà installé sous Windows ; Brave ou Chrome au choix dans
+   Réglages (`depot.navigateur: brave`), rien d'autre à télécharger. Il refuse le
+   bandeau de cookies, descend dans la page et suit « Carrières », « Nous rejoindre »,
+   puis « Candidature spontanée » ou « Postuler » (jamais un bouton d'envoi, jamais
+   un site d'offres), puis remplit prénom, nom, mail,
    téléphone, ville, école, diplôme et message, et joint le CV et la lettre en PDF.
    Les champs remplis sont entourés en vert, ceux à compléter en rouge.
 3. Il s'arrête là : **c'est toi qui relis, coches les consentements et cliques sur
    Envoyer.** Jamais de clic d'envoi automatique, ni de CAPTCHA contourné.
 4. Si le site demande un compte, tu te connectes ou le crées toi-même dans la fenêtre
    (tu choisis le mot de passe, l'outil ne le voit pas) ; le remplissage reprend sur la
-   page suivante. Les sessions restent dans `donnees/navigateur`.
+   page suivante. Les sessions restent dans `donnees/navigateur/<navigateur>`, un profil
+   à part de ton profil habituel.
 5. La carte affiche l'avancement. À la page « Merci pour votre candidature », clique
    « C'est déposé » : le suivi et les relances démarrent.
 

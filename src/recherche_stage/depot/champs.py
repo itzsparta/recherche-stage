@@ -37,6 +37,11 @@ CONFIRMATION = re.compile(
 )
 # Liens ou boutons qui mènent au formulaire (jamais un bouton d'envoi).
 VERS_FORMULAIRE = re.compile(r"candidature spontanee|candidater|postuler|deposer (un|mon|votre) cv|apply( now)?$|spontaneous")
+# Puis, à défaut, ceux qui mènent vers l'espace recrutement du site.
+VERS_CARRIERES = re.compile(r"nous rejoindre|rejoignez|rejoindre|carrieres?\b|careers?\b|recrutement|recrute|travailler (chez|avec)"
+                            r"|join us|talents?\b|offres? d.emploi|nos offres|emplois?\b|\bjobs?\b|espace candidat")
+ADRESSE_CARRIERES = re.compile(r"carriere|career|recrut|rejoindre|rejoignez|join|jobs?\b|emploi|candidat|talent")
+REFUS_COOKIES = re.compile(r"^(tout )?refuser( tout| tous les cookies| les cookies)?$|continuer sans accepter|reject all|decline all|^deny$")
 ENVOI = re.compile(r"envoyer|soumettre|submit|send|valider|confirmer|terminer")
 
 
@@ -109,3 +114,30 @@ def blocage(champs: list[dict], cadres: list[str]) -> str | None:
 
 def est_confirmation(texte_page: str) -> bool:
     return bool(CONFIRMATION.search(normaliser(texte_page)))
+
+
+def choisir_lien(liens: list[dict], deja: set[str]) -> dict | None:
+    """Lien à suivre vers le formulaire : d'abord « Candidature spontanée » ou
+    « Postuler », sinon « Carrières » / « Nous rejoindre ». Jamais un bouton
+    d'envoi, un site d'offres ou un lien déjà suivi."""
+    from ..sites import site_tiers
+
+    meilleur, rang = None, 9
+    for lien in liens:
+        texte, adresse = normaliser(lien.get("texte", "")), (lien.get("href") or "").lower()
+        cle = adresse or texte
+        if not cle or cle in deja or ENVOI.search(texte) or len(texte) > 60 or adresse.startswith(("mailto:", "tel:")):
+            continue
+        if adresse.startswith("http") and site_tiers(adresse):
+            continue
+        if VERS_FORMULAIRE.search(texte):
+            r = 0
+        elif VERS_CARRIERES.search(texte):
+            r = 1
+        elif ADRESSE_CARRIERES.search(adresse.split("?")[0]):
+            r = 2
+        else:
+            continue
+        if r < rang:
+            meilleur, rang = lien, r
+    return meilleur

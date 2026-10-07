@@ -161,6 +161,15 @@ FORMULAIRE = """<!doctype html><meta charset="utf-8"><title>Candidature</title>
 </form>"""
 CARRIERES = """<!doctype html><meta charset="utf-8"><title>Carrières</title>
 <input type="search" placeholder="Rechercher une offre"><a href="/formulaire.html">Candidature spontanée</a>"""
+ACCUEIL = """<!doctype html><meta charset="utf-8"><title>Groupe</title>
+<div id="cookies" style="position:fixed;inset:0;background:#fff"><p>Nous utilisons des cookies.</p>
+  <button onclick="document.getElementById('cookies').remove()">Tout accepter</button>
+  <button onclick="document.getElementById('cookies').remove()">Continuer sans accepter</button></div>
+<label>Votre e-mail <input type="email" name="newsletter_mail"></label>
+<div style="height:3000px">Nos activités</div>
+<footer><a href="https://fr.linkedin.com/company/x">Jobs</a><a href="/carrieres2.html">Carrières</a></footer>"""
+CARRIERES2 = """<!doctype html><meta charset="utf-8"><a href="/accueil.html">Accueil</a><a href="/rejoindre.html">Nous rejoindre</a>"""
+REJOINDRE = """<!doctype html><meta charset="utf-8"><p>Pas d'offre ?</p><a href="/formulaire.html">Candidature spontanée</a>"""
 CONNEXION = """<!doctype html><meta charset="utf-8"><label>E-mail <input name="login"></label>
 <label>Mot de passe <input type="password" name="pw"></label><button>Se connecter</button>"""
 
@@ -169,7 +178,8 @@ CONNEXION = """<!doctype html><meta charset="utf-8"><label>E-mail <input name="l
 def site(tmp_path_factory):
     racine = tmp_path_factory.mktemp("site")
     for nom, html in {"formulaire.html": FORMULAIRE, "carrieres.html": CARRIERES, "connexion.html": CONNEXION,
-                      "merci.html": "<p>Merci pour votre candidature !</p>"}.items():
+                      "merci.html": "<p>Merci pour votre candidature !</p>",
+                      "accueil.html": ACCUEIL, "carrieres2.html": CARRIERES2, "rejoindre.html": REJOINDRE}.items():
         (racine / nom).write_text(html, encoding="utf-8")
     class Silencieux(SimpleHTTPRequestHandler):
         def log_message(self, *args):
@@ -265,3 +275,36 @@ def test_sites_d_offres_et_alternance_ecartes(ctx, orchestrateur):  # noqa: F811
     orchestrateur.definir_page_carriere(d.id, lba)
     orchestrateur.preparer_depot(d.id)
     assert par_entreprise(ctx, "Sans Adresse").fiche_entreprise.page_carriere == lba
+
+
+def test_descend_vers_carrieres_puis_nous_rejoindre_jusqu_au_formulaire(navigateur, site, remplisseur):
+    page = navigateur.new_page()
+    page.goto(f"{site}/accueil.html")
+    for _ in range(4):
+        etat = remplisseur.passe(page)
+        if etat.etat != "ouverture":
+            break
+        assert remplisseur.vers_formulaire(page)
+    assert page.url.endswith("/formulaire.html"), page.url
+    assert remplisseur.navigation == ["Carrières", "Nous rejoindre", "Candidature spontanée"]  # cookies refusés en passant
+    assert etat.etat == "manque" and page.input_value("#p") == "Rémi"
+    page.goto(f"{site}/accueil.html")  # un seul champ (newsletter) : pas un formulaire de candidature, rien rempli
+    nouveau = Remplisseur({"email": "remi@example.org"}, {})
+    assert nouveau.passe(page).etat == "ouverture" and page.input_value("[name=newsletter_mail]") == ""
+
+
+def test_choix_du_navigateur(tmp_path, monkeypatch):
+    from recherche_stage.depot import __main__ as principal
+
+    assert principal.candidats("")[0] == {"channel": "msedge"}
+    assert principal.candidats("Chrome") == [{"channel": "chrome"}]
+    brave = tmp_path / "BraveSoftware" / "Brave-Browser" / "Application" / "brave.exe"
+    brave.parent.mkdir(parents=True)
+    brave.write_bytes(b"")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert principal.candidats("brave") == [{"executable_path": str(brave)}]
+    assert principal.candidats(str(brave)) == [{"executable_path": str(brave)}]
+    with pytest.raises(RuntimeError, match="inconnu"):
+        principal.candidats("firefox")
+    assert lancement.nom_profil("brave") == "brave" and lancement.nom_profil(None) == "edge"
+    assert lancement.nom_profil(r"C:\Program Files\BraveSoftware\brave.exe") == "brave"

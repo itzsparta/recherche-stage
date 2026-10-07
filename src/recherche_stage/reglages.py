@@ -1,7 +1,7 @@
 """Réglages modifiables depuis l'interface, écrits dans `config.yaml`.
 
 Seule une liste fermée de champs est proposée : zone, secteurs, rythme,
-dépôt en présentiel, tableau Excel. Jamais de secret ni de nom de variable
+dépôt en présentiel, navigateur du dépôt assisté, tableau Excel. Jamais de secret ni de nom de variable
 d'environnement. Le fichier est modifié ligne à ligne pour garder ses
 commentaires ; l'ancienne version est copiée dans `config.yaml.precedent`.
 """
@@ -29,6 +29,8 @@ CHAMPS: dict[tuple[str, str], tuple[str, str, str]] = {
     ("presentiel", "domicile"): ("Point de départ des dépôts sur place", "texte", "Adresse ou ville ; vide : la ville du CV"),
     ("presentiel", "distance_max_km"): ("Distance maximale pour un dépôt sur place (km)", "nombre", ""),
     ("presentiel", "effectif_max"): ("Effectif maximal pour un dépôt sur place", "entier", ""),
+    ("depot", "navigateur"): ("Navigateur pour « Remplir pour moi »", "texte",
+                              "brave, edge ou chrome, ou chemin complet du .exe ; vide : Edge"),
     ("suivi", "excel"): ("Tableau Excel de suivi", "texte", "Chemin complet du fichier .xlsx ; vide : aucun"),
 }
 

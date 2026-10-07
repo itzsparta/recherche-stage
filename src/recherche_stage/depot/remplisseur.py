@@ -55,8 +55,11 @@ COLLECTE = r"""
 
 LIENS = r"""
 () => [...document.querySelectorAll("a[href], button, [role=button]")]
-  .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest("form"); })
-  .map((e, i) => { e.dataset.rsLien = String(i); return { i: String(i), texte: (e.innerText || e.getAttribute("aria-label") || "").trim().slice(0, 80) }; })
+  .filter(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+    return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && !e.closest("form"); })
+  .map((e, i) => { e.dataset.rsLien = String(i);
+    return { i: String(i), texte: (e.innerText || e.getAttribute("aria-label") || e.title || "").trim().slice(0, 80),
+             href: e.tagName === "A" ? e.href : "" }; })
 """
 
 BANDEAU = r"""
@@ -102,6 +105,9 @@ class Remplisseur:
         self.questions = questions or {}
         self.remplis: dict[str, str] = {}  # libellé -> clé, pour le compte rendu
         self.clics = 0
+        self.suivis: set[str] = set()  # liens déjà suivis (pas de boucle)
+        self.cookies: set[str] = set()  # pages où le bandeau de cookies a été refusé
+        self.navigation: list[str] = []  # liens suivis, pour le compte rendu
 
     def _valeur(self, cle: str) -> str | None:
         if cle.startswith("question:"):
@@ -113,42 +119,17 @@ class Remplisseur:
         manquants: list[str] = []
         tous: list[dict] = []
         cadres = [f.url for f in page.frames]
-        fichiers_mis: set[str] = set()
+        collectes = []
         for cadre in page.frames:
             try:
-                liste = cadre.evaluate(COLLECTE)
+                collectes.append((cadre, cadre.evaluate(COLLECTE)))
             except Exception:  # cadre détaché ou d'une autre origine bloquée : on passe
                 continue
+        for _, liste in collectes:
             tous += liste
-            fichiers_restants = [c for c in liste if c["type"] == "file"]
-            for c in liste:
-                if c["fait"]:
-                    if c["type"] == "file":
-                        fichiers_mis.add(c["cle"])
-                    continue
-                cle = reco.reconnaitre(c, self.questions)
-                if c["type"] == "file":
-                    # Deux champs « fichier » sans libellé clair : le CV puis la lettre.
-                    if cle == "cv" and "cv" in fichiers_mis and len(fichiers_restants) > 1:
-                        cle = "lettre_fichier"
-                    chemin = self.fichiers.get(cle or "")
-                    if chemin and c["vide"] and cle not in fichiers_mis:
-                        cadre.locator(f'[data-rs="{c["rs"]}"]').set_input_files(chemin)
-                        fichiers_mis.add(cle)
-                        self._marquer(cadre, c, cle, "#2a8")
-                    elif c["obligatoire"] and c["vide"]:
-                        manquants.append(c["libelle"] or c["name"] or "fichier")
-                    continue
-                valeur = self._valeur(cle) if cle else None
-                if valeur and c["vide"]:
-                    try:
-                        cadre.locator(f'[data-rs="{c["rs"]}"]').fill(valeur, timeout=3000)
-                        self._marquer(cadre, c, cle, "#2a8")
-                    except Exception:
-                        pass
-                elif c["obligatoire"] and c["vide"] and c["visible"] and c["balise"] != "select":
-                    manquants.append(c["libelle"] or c["placeholder"] or c["name"] or "champ")
-                    cadre.evaluate(MARQUER, [c["rs"], "#d33", ""])
+        if self.est_formulaire(tous):
+            for cadre, liste in collectes:
+                self._remplir_cadre(cadre, liste, manquants)
         etat = Etat(url=page.url, remplis=list(self.remplis), manquants=list(dict.fromkeys(manquants)))
         texte = ""
         try:
@@ -163,13 +144,53 @@ class Remplisseur:
         elif bloque == "connexion":
             etat.etat, etat.message = "connexion", ("Le site demande de te connecter ou de créer un compte : fais-le dans la "
                                                     "fenêtre (tu choisis le mot de passe), je remplis la suite.")
-        elif not self.remplis and not any(reco.reconnaitre(c, self.questions) for c in tous if c["visible"] or c["type"] == "file"):
-            etat.etat, etat.message = "ouverture", "Pas encore de formulaire sur cette page : ouvre le formulaire de candidature."
+        elif not self.est_formulaire(tous):
+            chemin = " → ".join(self.navigation[-4:])
+            etat.etat, etat.message = "ouverture", ("Pas encore de formulaire sur cette page" + (f" (suivi : {chemin})" if chemin else "")
+                                                    + " : ouvre le formulaire de candidature, je le remplirai.")
         elif etat.manquants:
             etat.etat, etat.message = "manque", "À compléter toi-même (rien n'est deviné) : " + ", ".join(etat.manquants[:6])
         else:
             etat.etat, etat.message = "rempli", "Formulaire rempli : relis, coche les consentements, puis clique toi-même sur Envoyer."
         return etat
+
+    def est_formulaire(self, champs: list[dict]) -> bool:
+        """Formulaire de candidature : un fichier à joindre, ou au moins deux champs
+        reconnus (une simple case « newsletter » ou une recherche ne compte pas)."""
+        if self.remplis:
+            return True
+        cles = [reco.reconnaitre(c, self.questions) for c in champs if c["visible"] or c["type"] == "file"]
+        return "cv" in cles or "lettre_fichier" in cles or len({c for c in cles if c}) >= 2
+
+    def _remplir_cadre(self, cadre, liste: list[dict], manquants: list[str]) -> None:
+        fichiers_mis = {c["cle"] for c in liste if c["fait"] and c["type"] == "file"}
+        fichiers_restants = [c for c in liste if c["type"] == "file"]
+        for c in liste:
+            if c["fait"]:
+                continue
+            cle = reco.reconnaitre(c, self.questions)
+            if c["type"] == "file":
+                # Deux champs « fichier » sans libellé clair : le CV puis la lettre.
+                if cle == "cv" and "cv" in fichiers_mis and len(fichiers_restants) > 1:
+                    cle = "lettre_fichier"
+                chemin = self.fichiers.get(cle or "")
+                if chemin and c["vide"] and cle not in fichiers_mis:
+                    cadre.locator(f'[data-rs="{c["rs"]}"]').set_input_files(chemin)
+                    fichiers_mis.add(cle)
+                    self._marquer(cadre, c, cle, "#2a8")
+                elif c["obligatoire"] and c["vide"]:
+                    manquants.append(c["libelle"] or c["name"] or "fichier")
+                continue
+            valeur = self._valeur(cle) if cle else None
+            if valeur and c["vide"]:
+                try:
+                    cadre.locator(f'[data-rs="{c["rs"]}"]').fill(valeur, timeout=3000)
+                    self._marquer(cadre, c, cle, "#2a8")
+                except Exception:
+                    pass
+            elif c["obligatoire"] and c["vide"] and c["visible"] and c["balise"] != "select":
+                manquants.append(c["libelle"] or c["placeholder"] or c["name"] or "champ")
+                cadre.evaluate(MARQUER, [c["rs"], "#d33", ""])
 
     def _marquer(self, cadre, c: dict, cle: str, couleur: str) -> None:
         self.remplis[c["libelle"] or c["name"] or cle] = cle
@@ -179,25 +200,50 @@ class Remplisseur:
             pass
 
     def vers_formulaire(self, page) -> bool:
-        """Sur une page carrière sans formulaire, suit le lien « Candidature
-        spontanée » ou « Postuler » (deux fois au plus). Jamais un bouton d'envoi."""
-        if self.clics >= 2:
+        """Sur une page sans formulaire : refuse les cookies si un bandeau gêne,
+        descend dans la page, puis suit « Candidature spontanée » / « Postuler »,
+        ou à défaut « Carrières » / « Nous rejoindre » (six liens au plus en tout).
+        Jamais un bouton d'envoi."""
+        if self.clics >= 6:
             return False
+        liens = self._liens(page)
+        refus = next((lien for lien in liens if reco.REFUS_COOKIES.search(reco.normaliser(lien["texte"]))), None)
+        if refus and page.url not in self.cookies:
+            self.cookies.add(page.url)
+            self._cliquer(page, refus, attendre=False)
+            liens = self._liens(page)
+        lien = reco.choisir_lien(liens, self.suivis)
+        if lien is None:  # liens du bas de page parfois chargés au défilement
+            try:
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(1200)
+            except Exception:
+                return False
+            lien = reco.choisir_lien(self._liens(page), self.suivis)
+        if lien is None:
+            return False
+        self.suivis.add((lien.get("href") or reco.normaliser(lien["texte"])).lower())
+        self.clics += 1
+        self.navigation.append(lien["texte"] or lien.get("href", ""))
+        return self._cliquer(page, lien)
+
+    @staticmethod
+    def _liens(page) -> list[dict]:
         try:
-            liens = page.evaluate(LIENS)
+            return page.evaluate(LIENS)
+        except Exception:
+            return []
+
+    @staticmethod
+    def _cliquer(page, lien: dict, attendre: bool = True) -> bool:
+        try:
+            page.locator(f'[data-rs-lien="{lien["i"]}"]').first.click(timeout=5000)
+            if attendre:
+                page.wait_for_load_state("domcontentloaded", timeout=15000)
+            page.wait_for_timeout(800)
         except Exception:
             return False
-        for lien in liens:
-            texte = reco.normaliser(lien["texte"])
-            if reco.VERS_FORMULAIRE.search(texte) and not reco.ENVOI.search(texte):
-                self.clics += 1
-                try:
-                    page.locator(f'[data-rs-lien="{lien["i"]}"]').first.click(timeout=5000)
-                    page.wait_for_load_state("domcontentloaded", timeout=15000)
-                except Exception:
-                    return False
-                return True
-        return False
+        return True
 
 
 def bandeau(page, message: str) -> None:

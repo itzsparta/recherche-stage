@@ -139,6 +139,12 @@ class ParamsPresentiel(BaseModel):
     effectif_max: int = 250  # au-delà, le recrutement est rarement décidé sur place
 
 
+class ParamsDepot(BaseModel):
+    """« Remplir pour moi » sur les sites carrière."""
+    # brave, edge ou chrome, ou le chemin complet de l'exécutable ; vide : Edge, sinon Chrome.
+    navigateur: str | None = None
+
+
 class EntrepriseATS(BaseModel):
     """Un site carrière. Donner soit `url` (page carrière hébergée par l'ATS),
     soit `ats` + `identifiant`."""
@@ -206,6 +212,7 @@ class Config(BaseModel):
     envoi: ParamsEnvoi = Field(default_factory=ParamsEnvoi)
     suivi: ParamsSuivi = Field(default_factory=ParamsSuivi)
     presentiel: ParamsPresentiel = Field(default_factory=ParamsPresentiel)
+    depot: ParamsDepot = Field(default_factory=ParamsDepot)
     sources: ParamsSources = Field(default_factory=ParamsSources)
     conservation_mois: int = 12
 

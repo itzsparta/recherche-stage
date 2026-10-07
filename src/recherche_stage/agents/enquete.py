@@ -17,6 +17,7 @@ from ..hachage import normaliser_entreprise
 from ..llm import ErreurLLM
 from ..modeles import Dossier, FaitSource, FicheEntreprise, Statut
 from ..reseau import ErreurReseau
+from ..sites import site_tiers
 from .base import Agent
 
 SYSTEME_RECHERCHE = """Tu prépares une candidature de stage. Renseigne-toi sur l'entreprise indiquée :
@@ -67,20 +68,6 @@ Chaîne vide si les notes n'en donnent pas avec certitude."""
 
 
 PAGE_CARRIERE = re.compile(r"carriere|career|recrut|/jobs?\b|emploi|candidat|join-?us|rejoign|talent")
-
-
-# Sites d'offres, d'alternance et annuaires : pas l'endroit où l'entreprise reçoit une candidature de stage.
-SITES_TIERS = (
-    "labonnealternance", "alternance.emploi.gouv", "indeed.", "linkedin.", "welcometothejungle.", "hellowork.", "jobteaser.",
-    "francetravail.", "pole-emploi.", "apec.fr", "monster.", "glassdoor.", "meteojob.", "regionsjob.", "cadremploi.", "jobijoba.",
-    "keljob.", "optioncarriere.", "studentjob.", "letudiant.fr", "1jeune1solution", "annuaire-entreprises.", "societe.com",
-    "pappers.", "pagesjaunes.", "infogreffe.", "manageo.", "verif.com", "wikipedia.", "facebook.", "google.",
-)
-
-
-def site_tiers(url: str) -> bool:
-    hote = url.split("://", 1)[-1].split("/", 1)[0].lower()
-    return any(t in hote for t in SITES_TIERS)
 
 
 def _cle_url(url: str) -> str:

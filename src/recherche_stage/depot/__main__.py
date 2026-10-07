@@ -9,20 +9,53 @@ from pathlib import Path
 
 from .remplisseur import Etat, Remplisseur, deposer
 
-CANAUX = ("msedge", "chrome", None)  # Edge est déjà installé sous Windows : rien à télécharger
+import os
+import shutil
+
+CANAUX = {"edge": "msedge", "msedge": "msedge", "chrome": "chrome"}
 
 
-def ouvrir_navigateur(playwright, profil: str):
+def chemins_brave() -> list[str]:
+    """Emplacements habituels de Brave (Windows, macOS, Linux)."""
+    chemins = []
+    for variable in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+        base = os.environ.get(variable)
+        if base:
+            chemins.append(os.path.join(base, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"))
+    chemins.append("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser")
+    chemins += [c for c in (shutil.which("brave-browser"), shutil.which("brave")) if c]
+    return chemins
+
+
+def candidats(choix: str) -> list[dict]:
+    """Façons de lancer le navigateur choisi, dans l'ordre d'essai."""
+    choix = (choix or "").strip()
+    if not choix:  # Edge est déjà installé sous Windows : rien à télécharger
+        return [{"channel": "msedge"}, {"channel": "chrome"}, {}]
+    if choix.lower() in CANAUX:
+        return [{"channel": CANAUX[choix.lower()]}]
+    if choix.lower() == "brave":
+        trouves = [c for c in chemins_brave() if os.path.isfile(c)]
+        if not trouves:
+            raise RuntimeError("Brave introuvable aux emplacements habituels : dans Réglages, mets le chemin complet de brave.exe "
+                               "(clic droit sur le raccourci Brave → Propriétés → Cible).")
+        return [{"executable_path": trouves[0]}]
+    if os.path.isfile(choix):
+        return [{"executable_path": choix}]
+    raise RuntimeError(f"Navigateur « {choix} » inconnu : brave, edge, chrome, ou le chemin complet de l'exécutable.")
+
+
+def ouvrir_navigateur(playwright, profil: str, choix: str = ""):
     erreur: Exception | None = None
     for bac_a_sable in (True, False):  # le bac à sable évite l'avertissement --no-sandbox ; repli si refusé
-        for canal in CANAUX:
+        for options in candidats(choix):
             try:
                 return playwright.chromium.launch_persistent_context(
-                    profil, channel=canal, headless=False, chromium_sandbox=bac_a_sable, accept_downloads=False,
-                    no_viewport=True, args=["--start-maximized"])
+                    profil, headless=False, chromium_sandbox=bac_a_sable, accept_downloads=False,
+                    no_viewport=True, args=["--start-maximized"], **options)
             except Exception as e:  # navigateur absent : on essaie le suivant
                 erreur = e
-    raise RuntimeError(f"Aucun navigateur utilisable (Edge, Chrome ou Chromium de Playwright) : {erreur}")
+    raise RuntimeError(f"Impossible d'ouvrir le navigateur ({choix or 'Edge, Chrome ou Chromium'}) : {erreur}")
 
 
 def main(chemin_tache: str) -> int:
@@ -38,7 +71,7 @@ def main(chemin_tache: str) -> int:
     remplisseur = Remplisseur(tache["valeurs"], tache["fichiers"], tache.get("questions"))
     try:
         with sync_playwright() as p:
-            contexte = ouvrir_navigateur(p, tache["profil_navigateur"])
+            contexte = ouvrir_navigateur(p, tache["profil_navigateur"], tache.get("navigateur", ""))
             try:
                 deposer(contexte, tache["url"], remplisseur, chemin_etat)
             finally:

@@ -17,7 +17,7 @@ from . import controles
 from .agents.apprentissage import PREFIXE_MOTIF, AgentApprentissage
 from .agents.base import Contexte
 from .agents.critique import AgentCritique
-from .agents.enquete import AgentEnquete, site_tiers
+from .agents.enquete import AgentEnquete
 from .agents.envoi import AgentEnvoi
 from .agents.profil import AgentProfil
 from .agents.redaction import AgentRedaction
@@ -29,6 +29,7 @@ from .depot import lancement
 from .llm import BudgetEpuise, ErreurLLM, NonConnecte, QuotaEpuise
 from .modeles import Critique, Dossier, Envoi, Statut
 from .reseau import ErreurReseau
+from .sites import site_tiers
 from .sources import Source
 
 ERREURS_AVANT_FILE = 3  # au-delà, le dossier part dans la file des irrécupérables

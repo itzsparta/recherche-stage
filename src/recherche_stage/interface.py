@@ -342,7 +342,7 @@ class Application:
         formulaire se remplit ; l'utilisateur relit et clique lui-même sur Envoyer."""
         if not lancement.disponible():
             raise Refus("Le remplissage automatique a besoin de Playwright. Dans le terminal (venv activé) : "
-                        "pip install playwright — il utilise Edge, déjà installé, rien d'autre à télécharger.")
+                        "pip install playwright — il utilise ton navigateur (Edge par défaut, ou Brave/Chrome dans Réglages), rien d'autre à télécharger.")
         if self._depot_actif(dossier.id):
             raise Refus("La fenêtre de dépôt est déjà ouverte pour ce dossier.")
         identifiant, entreprise = dossier.id, dossier.offre.entreprise
@@ -350,7 +350,7 @@ class Application:
         def travail(orch: Orchestrateur) -> Counter:
             try:
                 tache = orch.preparer_depot(identifiant)
-                orch.progres("  ouverture du navigateur (Edge, sinon Chrome)…")
+                orch.progres(f"  ouverture du navigateur ({lancement.libelle_navigateur(orch.ctx.config.depot.navigateur)})…")
                 self.depots[identifiant] = self.lanceur_depot(tache)
             except Exception as e:  # visible sur la carte, pas seulement dans le journal
                 lancement.ecrire_etat(orch.ctx, identifiant, "erreur", str(e))

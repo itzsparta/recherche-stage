@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +16,21 @@ from ..modeles import Dossier
 FICHIER_ETAT = "depot_etat.json"
 FICHIER_JOURNAL = "depot_journal.txt"
 EN_COURS = ("ouverture", "rempli", "connexion", "captcha", "manque")
+
+
+def _nom(navigateur: str) -> str:
+    """« brave » pour « brave » comme pour un chemin Windows « …\\brave.exe »."""
+    return re.sub(r"\.exe$", "", re.split(r"[\\/]", navigateur)[-1], flags=re.IGNORECASE)
+
+
+def nom_profil(navigateur: str | None) -> str:
+    nom = _nom(navigateur or "edge").lower()
+    return re.sub(r"[^a-z0-9]+", "-", nom).strip("-") or "edge"
+
+
+def libelle_navigateur(navigateur: str | None) -> str:
+    return {"brave": "Brave", "edge": "Edge", "msedge": "Edge", "chrome": "Chrome"}.get(
+        (navigateur or "").strip().lower(), "Edge, sinon Chrome" if not navigateur else _nom(navigateur))
 
 
 def disponible() -> bool:
@@ -56,7 +72,9 @@ def preparer(ctx: Contexte, dossier: Dossier, pieces: list[Path]) -> Path:
         "fichiers": {"cv": cv, "lettre_fichier": lettre},
         "questions": dossier.documents.reponses_formulaire,
         "etat": str(etat),
-        "profil_navigateur": str(ctx.config.dossier_donnees / "navigateur"),
+        # Un profil par navigateur (deux navigateurs ne partagent pas un même profil) ; les sessions y restent.
+        "profil_navigateur": str(ctx.config.dossier_donnees / "navigateur" / nom_profil(ctx.config.depot.navigateur)),
+        "navigateur": ctx.config.depot.navigateur or "",
     }, ensure_ascii=False), encoding="utf-8")
     return tache
 
