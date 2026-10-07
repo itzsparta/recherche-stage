@@ -173,13 +173,31 @@ REJOINDRE = """<!doctype html><meta charset="utf-8"><p>Pas d'offre ?</p><a href=
 CONNEXION = """<!doctype html><meta charset="utf-8"><label>E-mail <input name="login"></label>
 <label>Mot de passe <input type="password" name="pw"></label><button>Se connecter</button>"""
 
+# Site d'ATS : bandeau de cookies dans un shadow DOM, page entière dans un <form> (ASP.NET),
+# « Je postule » qui mène à une connexion, puis la création de compte.
+OFFRE = """<!doctype html><meta charset="utf-8"><div id="cmp"></div>
+<script>const r = document.getElementById("cmp").attachShadow({mode: "open"});
+r.innerHTML = '<div style="position:fixed;inset:0;background:#fff"><p>Ce site utilise des cookies.</p>' +
+  '<button onclick="this.parentNode.remove()">Tout accepter</button><button id="non" onclick="this.parentNode.remove()">Tout refuser</button></div>';</script>
+<form id="aspnet"><input type="search" placeholder="Mot-clé"><h1>Stage maintenance</h1>
+<button type="button" onclick="location='/connexion2.html'">Je postule</button></form>"""
+CONNEXION2 = """<!doctype html><meta charset="utf-8"><form action="/merci.html">
+<label>E-mail <input name="login"></label><label>Mot de passe <input type="password" name="pw"></label>
+<button type="submit">Se connecter</button><a href="/inscription.html">Créer un compte</a></form>"""
+INSCRIPTION = """<!doctype html><meta charset="utf-8"><form action="/merci.html">
+<label for="p">Prénom</label><input id="p" name="prenom"><label for="n">Nom</label><input id="n" name="nom">
+<label for="m">E-mail</label><input id="m" type="email" name="email">
+<label for="pw">Mot de passe</label><input id="pw" type="password" name="pw">
+<label><input type="checkbox" name="cgu"> J'accepte les conditions</label><button type="submit">Créer mon compte</button></form>"""
+
 
 @pytest.fixture(scope="module")
 def site(tmp_path_factory):
     racine = tmp_path_factory.mktemp("site")
     for nom, html in {"formulaire.html": FORMULAIRE, "carrieres.html": CARRIERES, "connexion.html": CONNEXION,
                       "merci.html": "<p>Merci pour votre candidature !</p>",
-                      "accueil.html": ACCUEIL, "carrieres2.html": CARRIERES2, "rejoindre.html": REJOINDRE}.items():
+                      "accueil.html": ACCUEIL, "carrieres2.html": CARRIERES2, "rejoindre.html": REJOINDRE,
+                      "offre.html": OFFRE, "connexion2.html": CONNEXION2, "inscription.html": INSCRIPTION}.items():
         (racine / nom).write_text(html, encoding="utf-8")
     class Silencieux(SimpleHTTPRequestHandler):
         def log_message(self, *args):
@@ -291,6 +309,40 @@ def test_descend_vers_carrieres_puis_nous_rejoindre_jusqu_au_formulaire(navigate
     page.goto(f"{site}/accueil.html")  # un seul champ (newsletter) : pas un formulaire de candidature, rien rempli
     nouveau = Remplisseur({"email": "remi@example.org"}, {})
     assert nouveau.passe(page).etat == "ouverture" and page.input_value("[name=newsletter_mail]") == ""
+
+
+def test_cookies_postuler_puis_creation_de_compte(navigateur, site, remplisseur, tmp_path):
+    comptes = tmp_path / "comptes.json"
+    remplisseur.fichier_comptes = comptes
+    page = navigateur.new_page()
+    page.goto(f"{site}/offre.html")
+    assert remplisseur.refuser_cookies(page)  # dans le shadow DOM, « Tout refuser » et non « Tout accepter »
+    assert page.evaluate("document.getElementById('cmp').shadowRoot.querySelector('#non')") is None
+    assert remplisseur.passe(page).etat == "ouverture"
+    assert remplisseur.vers_formulaire(page) and page.url.endswith("/connexion2.html")  # « Je postule » dans le <form> de page
+    assert remplisseur.passe(page).etat == "connexion"
+    assert remplisseur.vers_inscription(page) and page.url.endswith("/inscription.html")  # jamais « Se connecter »
+    etat = remplisseur.passe(page)
+    assert etat.etat == "connexion" and "mot de passe" in etat.message
+    assert page.input_value("#p") == "Rémi" and page.input_value("#m") == "remi@example.org"
+    assert page.input_value("#pw") == "" and not page.is_checked("[name=cgu]")  # mot de passe et conditions : à toi
+    assert not remplisseur.vers_inscription(page) and page.url.endswith("/inscription.html")  # « Créer mon compte » jamais cliqué
+
+    # La fois suivante sur ce site : le compte existe, c'est à toi de te connecter.
+    suivant = Remplisseur({"email": "remi@example.org"}, {}, fichier_comptes=comptes)
+    page.goto(f"{site}/connexion2.html")
+    etat = suivant.passe(page)
+    assert "Compte commencé" in etat.message and not suivant.vers_inscription(page)
+
+
+def test_choix_des_liens():
+    assert reco.choisir_lien([{"texte": "Postuler avec LinkedIn"}, {"texte": "Postuler sans compte"}, {"texte": "Postuler"}], set())[
+        "texte"] == "Postuler sans compte"
+    assert reco.choisir_lien([{"texte": "Postuler", "formulaire": True}], set()) is None  # bouton d'un formulaire rempli
+    assert reco.choisir_lien([{"texte": "Je postule"}], set())["texte"] == "Je postule"
+    assert reco.choisir_inscription([{"texte": "Créer mon compte", "envoi": True}, {"texte": "S'inscrire à la newsletter"}]) is None
+    assert reco.choisir_inscription([{"texte": "Pas encore de compte ? Inscrivez-vous"}])
+    assert reco.REFUS_COOKIES.search("tout refuser") and not reco.REFUS_COOKIES.search("tout accepter")
 
 
 def test_choix_du_navigateur(tmp_path, monkeypatch):

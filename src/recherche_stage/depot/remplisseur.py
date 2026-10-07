@@ -7,7 +7,8 @@ fenêtre est ouverte : après une connexion ou à l'étape suivante d'un formula
 en plusieurs pages, les nouveaux champs sont remplis à leur tour.
 
 Le bot ne clique jamais sur un bouton d'envoi : seuls les liens qui mènent au
-formulaire (« Candidature spontanée », « Postuler ») peuvent être suivis.
+formulaire (« Candidature spontanée », « Postuler », « Créer un compte ») et le
+refus des cookies peuvent être cliqués. Le mot de passe n'est jamais rempli.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from . import champs as reco
 
@@ -54,12 +56,43 @@ COLLECTE = r"""
 """
 
 LIENS = r"""
-() => [...document.querySelectorAll("a[href], button, [role=button]")]
-  .filter(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
-    return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && !e.closest("form"); })
-  .map((e, i) => { e.dataset.rsLien = String(i);
+() => {
+  const visible = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+    return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
+  // Formulaire « à remplir » : un bouton qui s'y trouve pourrait l'envoyer.
+  const aRemplir = f => !!f && [...f.querySelectorAll("input, textarea")].some(c =>
+    !["hidden", "submit", "button", "image", "reset", "checkbox", "radio", "search"].includes((c.getAttribute("type") || "").toLowerCase()) && visible(c));
+  return [...document.querySelectorAll("a, button, [role=button], [role=link]")].filter(visible).map((e, i) => {
+    e.dataset.rsLien = String(i);
+    const f = e.closest("form");
     return { i: String(i), texte: (e.innerText || e.getAttribute("aria-label") || e.title || "").trim().slice(0, 80),
-             href: e.tagName === "A" ? e.href : "" }; })
+             href: e.tagName === "A" && e.getAttribute("href") ? e.href : "",
+             formulaire: aRemplir(f), envoi: !!f && e.type === "submit" };
+  });
+}
+"""
+
+# Refus du bandeau de cookies, y compris dans un shadow DOM : sélecteurs connus, puis texte du bouton.
+COOKIES = r"""
+([motif, selecteurs]) => {
+  const re = new RegExp(motif);
+  const norm = t => (t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const visible = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+    return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
+  const racines = [document];
+  for (let i = 0; i < racines.length; i++)
+    for (const e of racines[i].querySelectorAll("*")) if (e.shadowRoot) racines.push(e.shadowRoot);
+  for (const r of racines) for (const sel of selecteurs) {
+    const e = r.querySelector(sel);
+    if (e && visible(e)) { e.click(); return sel; }
+  }
+  if (!/cookie|traceur|consent/.test(norm(racines.map(r => (r === document ? document.documentElement : r).textContent || "").join(" ")))) return "";
+  for (const r of racines) for (const e of r.querySelectorAll("button, a, [role=button]")) {
+    const t = norm(e.innerText || e.getAttribute("aria-label") || "");
+    if (t && t.length < 60 && re.test(t) && visible(e)) { e.click(); return t; }
+  }
+  return "";
+}
 """
 
 BANDEAU = r"""
@@ -99,15 +132,26 @@ class Etat:
 
 
 class Remplisseur:
-    def __init__(self, valeurs: dict[str, str], fichiers: dict[str, str], questions: dict[str, str] | None = None):
+    def __init__(self, valeurs: dict[str, str], fichiers: dict[str, str], questions: dict[str, str] | None = None,
+                 fichier_comptes: Path | None = None):
         self.valeurs = {k: v for k, v in valeurs.items() if v}
         self.fichiers = {k: v for k, v in fichiers.items() if v and Path(v).exists()}
         self.questions = questions or {}
         self.remplis: dict[str, str] = {}  # libellé -> clé, pour le compte rendu
         self.clics = 0
         self.suivis: set[str] = set()  # liens déjà suivis (pas de boucle)
-        self.cookies: set[str] = set()  # pages où le bandeau de cookies a été refusé
+        self.cookies: dict[str, int] = {}  # page -> essais de refus du bandeau (3 au plus)
         self.navigation: list[str] = []  # liens suivis, pour le compte rendu
+        self.formulaire = False  # la dernière passe a vu un formulaire à remplir
+        # Sites où « Créer un compte » a déjà été ouvert (nom du site et date, rien d'autre) :
+        # la fois suivante, c'est à toi de te connecter.
+        self.fichier_comptes = fichier_comptes
+        self.comptes: dict[str, str] = {}
+        if fichier_comptes:
+            try:
+                self.comptes = json.loads(Path(fichier_comptes).read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                pass
 
     def _valeur(self, cle: str) -> str | None:
         if cle.startswith("question:"):
@@ -129,7 +173,8 @@ class Remplisseur:
                 continue
         for _, liste in collectes:
             tous += liste
-        if self.est_formulaire(tous):
+        self.formulaire = self.est_formulaire(tous)
+        if self.formulaire:
             for cadre, liste in collectes:
                 self._remplir_cadre(cadre, liste, manquants)
         etat = Etat(url=page.url, remplis=list(self.remplis), manquants=list(dict.fromkeys(manquants)))
@@ -144,9 +189,18 @@ class Remplisseur:
         elif bloque == "captcha":
             etat.etat, etat.message = "captcha", "Un CAPTCHA est affiché : coche-le dans la fenêtre, je reprends ensuite."
         elif bloque == "connexion":
-            etat.etat, etat.message = "connexion", ("Le site demande de te connecter ou de créer un compte : fais-le dans la "
-                                                    "fenêtre (tu choisis le mot de passe), je remplis la suite.")
-        elif not self.est_formulaire(tous):
+            etat.etat = "connexion"
+            cree = self.comptes.get(urlsplit(page.url).hostname or "")
+            if self.formulaire:
+                etat.message = ("Création de compte : j'ai rempli ce que je connais. Choisis ton mot de passe (je n'en mets "
+                                "jamais), accepte les conditions et valide toi-même ; je remplis la suite.")
+            elif cree:
+                etat.message = (f"Compte commencé sur ce site le {cree} : connecte-toi, je remplis la suite. "
+                                "Pas fini de le créer ? Clique « Créer un compte », je remplirai.")
+            else:
+                etat.message = ("Le site demande de te connecter ou de créer un compte : fais-le dans la "
+                                "fenêtre (tu choisis le mot de passe), je remplis la suite.")
+        elif not self.formulaire:
             chemin = " → ".join(self.navigation[-4:])
             etat.etat, etat.message = "ouverture", ("Pas encore de formulaire sur cette page" + (f" (suivi : {chemin})" if chemin else "")
                                                     + " : ouvre le formulaire de candidature, je le remplirai.")
@@ -208,13 +262,8 @@ class Remplisseur:
         Jamais un bouton d'envoi."""
         if self.clics >= 6:
             return False
-        liens = self._liens(page)
-        refus = next((lien for lien in liens if reco.REFUS_COOKIES.search(reco.normaliser(lien["texte"]))), None)
-        if refus and page.url not in self.cookies:
-            self.cookies.add(page.url)
-            self._cliquer(page, refus, attendre=False)
-            liens = self._liens(page)
-        lien = reco.choisir_lien(liens, self.suivis)
+        self.refuser_cookies(page)
+        lien = reco.choisir_lien(self._liens(page), self.suivis)
         if lien is None:  # liens du bas de page parfois chargés au défilement
             try:
                 page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -229,6 +278,46 @@ class Remplisseur:
         self.navigation.append(lien["texte"] or lien.get("href", ""))
         return self._cliquer(page, lien)
 
+    def refuser_cookies(self, page) -> bool:
+        """Refuse le bandeau de cookies de la page (trois essais par adresse : il
+        arrive souvent après le chargement). Jamais « Tout accepter »."""
+        essais = self.cookies.get(page.url, 0)
+        if essais >= 3:
+            return False
+        self.cookies[page.url] = essais + 1
+        for cadre in page.frames:
+            if reco.cadre_captcha(cadre.url):
+                continue
+            try:
+                clic = cadre.evaluate(COOKIES, [reco.REFUS_COOKIES.pattern, list(reco.SELECTEURS_REFUS)])
+            except Exception:
+                continue
+            if clic:
+                self.cookies[page.url] = 3
+                _attendre(page, 600)
+                return True
+        return False
+
+    def vers_inscription(self, page) -> bool:
+        """Page de connexion : ouvre « Créer un compte » pour que le formulaire
+        d'inscription soit rempli (sauf le mot de passe, toujours choisi par toi).
+        Une seule fois par site : la fois suivante, tu te connectes."""
+        hote = urlsplit(page.url).hostname or ""
+        if self.formulaire or not hote or hote in self.comptes or self.clics >= 8:
+            return False
+        lien = reco.choisir_inscription(self._liens(page))
+        if lien is None:
+            return False
+        self.comptes[hote] = datetime.now().strftime("%d/%m/%Y")
+        if self.fichier_comptes:
+            try:
+                Path(self.fichier_comptes).write_text(json.dumps(self.comptes, ensure_ascii=False), encoding="utf-8")
+            except OSError:
+                pass
+        self.clics += 1
+        self.navigation.append(lien["texte"])
+        return self._cliquer(page, lien)
+
     @staticmethod
     def _liens(page) -> list[dict]:
         try:
@@ -238,8 +327,12 @@ class Remplisseur:
 
     @staticmethod
     def _cliquer(page, lien: dict, attendre: bool = True) -> bool:
+        element = page.locator(f'[data-rs-lien="{lien["i"]}"]').first
         try:
-            page.locator(f'[data-rs-lien="{lien["i"]}"]').first.click(timeout=5000)
+            try:
+                element.click(timeout=5000)
+            except Exception:  # recouvert (bandeau, fenêtre surgissante) : clic direct sur le lien
+                element.evaluate("e => e.click()")
             if attendre:
                 page.wait_for_load_state("domcontentloaded", timeout=15000)
             page.wait_for_timeout(800)
@@ -278,8 +371,10 @@ def deposer(contexte, url: str, remplisseur: Remplisseur, chemin_etat: Path, dur
             break
         page = pages[-1]  # un lien « Postuler » ouvre parfois un nouvel onglet
         try:
+            remplisseur.refuser_cookies(page)
             etat = remplisseur.passe(page)
-            if etat.etat == "ouverture" and remplisseur.vers_formulaire(page):
+            if (etat.etat == "ouverture" and remplisseur.vers_formulaire(page)) or (
+                    etat.etat == "connexion" and remplisseur.vers_inscription(page)):
                 page.wait_for_timeout(1500)
                 continue
             bandeau(page, etat.message)

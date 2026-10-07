@@ -59,7 +59,8 @@ def main(chemin_tache: str) -> int:
     except ImportError:
         Etat("erreur", "Playwright n'est pas installé : pip install playwright").ecrire(chemin_etat)
         return 1
-    remplisseur = Remplisseur(tache["valeurs"], tache["fichiers"], tache.get("questions"))
+    comptes = Path(tache["profil_navigateur"]).parent / "comptes.json"  # sites où un compte a été commencé
+    remplisseur = Remplisseur(tache["valeurs"], tache["fichiers"], tache.get("questions"), comptes)
     try:
         with sync_playwright() as p:
             contexte = ouvrir_navigateur(p, tache["profil_navigateur"], tache.get("navigateur", ""))

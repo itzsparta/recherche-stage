@@ -36,12 +36,29 @@ CONFIRMATION = re.compile(
     r"|thank you for (applying|your application)|application (has been|was) (submitted|received)"
 )
 # Liens ou boutons qui mènent au formulaire (jamais un bouton d'envoi).
-VERS_FORMULAIRE = re.compile(r"candidature spontanee|candidater|postuler|deposer (un|mon|votre) cv|apply( now)?$|spontaneous")
+VERS_FORMULAIRE = re.compile(r"candidature spontanee|candidater|candidatez|postul(er|ez|e)\b|deposer (un|mon|votre) cv|apply( now)?$"
+                             r"|spontaneous")
+# Sur une fenêtre « Postuler avec LinkedIn / en invité / créer un compte » : sans compte d'abord.
+SANS_COMPTE = re.compile(r"sans (creer de |creer un |)compte|en tant qu.invite|\binvite\b|guest|candidature (rapide|express)")
+# Options qui passeraient par un autre site : jamais.
+VIA_TIERS = re.compile(r"linkedin|indeed|facebook|google|apple|welcome to the jungle|wttj|hellowork|jobteaser")
+# Page de connexion sans compte : le lien qui mène à la création de compte.
+CREER_COMPTE = re.compile(r"cree[rz]? (un |mon |votre |ton )?(compte|profil)|inscri(re|vez|ption)|nouveau candidat|nouvel utilisateur"
+                          r"|premiere (visite|candidature)|pas (encore )?de compte|create (an |your )?account|sign ?up|register|new user")
 # Puis, à défaut, ceux qui mènent vers l'espace recrutement du site.
 VERS_CARRIERES = re.compile(r"nous rejoindre|rejoignez|rejoindre|carrieres?\b|careers?\b|recrutement|recrute|travailler (chez|avec)"
                             r"|join us|talents?\b|offres? d.emploi|nos offres|emplois?\b|\bjobs?\b|espace candidat")
 ADRESSE_CARRIERES = re.compile(r"carriere|career|recrut|rejoindre|rejoignez|join|jobs?\b|emploi|candidat|talent")
-REFUS_COOKIES = re.compile(r"^(tout )?refuser( tout| tous les cookies| les cookies)?$|continuer sans accepter|reject all|decline all|^deny$")
+# Refus des cookies (texte normalisé ; motif compatible JavaScript, il sert aussi dans la page).
+REFUS_COOKIES = re.compile(r"^(tout refuser|refuser( tout| tous les cookies| les cookies| et fermer)?|je refuse|tout rejeter"
+                           r"|rejeter( tout| tous les cookies)?|non merci|reject( all)?|decline( all)?|deny( all)?|refuse all"
+                           r"|(cookies )?necessaires? uniquement|uniquement les (cookies )?necessaires|only necessary)$"
+                           r"|continuer sans accepter|continue without accepting")
+# Boutons « refuser » des bandeaux les plus courants (OneTrust, Didomi, Axeptio, Cookiebot, tarteaucitron,
+# Usercentrics, Complianz, CookieYes, Klaro).
+SELECTEURS_REFUS = ("#onetrust-reject-all-handler", "#didomi-notice-disagree-button", ".didomi-continue-without-agreeing",
+                    "#axeptio_btn_dismiss", "#CybotCookiebotDialogBodyButtonDecline", "#tarteaucitronAllDenied2",
+                    "[data-testid=uc-deny-all-button]", ".cmplz-deny", ".cky-btn-reject", ".cm-btn-decline")
 ENVOI = re.compile(r"envoyer|soumettre|submit|send|valider|confirmer|terminer")
 
 
@@ -132,9 +149,11 @@ def choisir_lien(liens: list[dict], deja: set[str]) -> dict | None:
         cle = adresse or texte
         if not cle or cle in deja or ENVOI.search(texte) or len(texte) > 60 or adresse.startswith(("mailto:", "tel:")):
             continue
-        if adresse.startswith("http") and site_tiers(adresse):
-            continue
-        if VERS_FORMULAIRE.search(texte):
+        if (adresse.startswith("http") and site_tiers(adresse)) or VIA_TIERS.search(texte) or lien.get("formulaire"):
+            continue  # un bouton pris dans un formulaire à remplir pourrait l'envoyer
+        if SANS_COMPTE.search(texte):
+            r = -1
+        elif VERS_FORMULAIRE.search(texte):
             r = 0
         elif VERS_CARRIERES.search(texte):
             r = 1
@@ -145,3 +164,14 @@ def choisir_lien(liens: list[dict], deja: set[str]) -> dict | None:
         if r < rang:
             meilleur, rang = lien, r
     return meilleur
+
+
+def choisir_inscription(liens: list[dict]) -> dict | None:
+    """Sur une page de connexion : le lien « Créer un compte » (jamais un bouton
+    qui envoie un formulaire, jamais une inscription à la newsletter)."""
+    for lien in liens:
+        texte = normaliser(lien.get("texte", ""))
+        if (CREER_COMPTE.search(texte) and not lien.get("envoi") and len(texte) <= 60 and "newsletter" not in texte
+                and not VIA_TIERS.search(texte) and not ENVOI.search(texte)):
+            return lien
+    return None
