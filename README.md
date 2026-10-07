@@ -139,6 +139,7 @@ rs interface                              # tout dans le navigateur (sous Window
                                           # dossier en cours), activité et appels LLM par agent, sources coupées
                                           # (« Réessayer »), propositions de l'Apprentissage à appliquer ou refuser
                                           # (comme `rs bilan --appliquer`, au cas par cas), bilan des résultats
+                                          # Candidature sans adresse mail : « Remplir pour moi » (voir plus bas)
 rs revue                                  # la même chose dans le terminal, une touche par élément
 rs consignes "Parcours académique d'abord"  # préférences de rédaction pour toutes les lettres
                                           # (dans l'interface : « Mes préférences de rédaction » ; et sur chaque
@@ -157,6 +158,28 @@ Autres commandes : `rs rejeter`, `rs reponse <id> entretien --date 2026-11-03T14
 `rs marquer-envoye`, `rs liberer-envoi`, `rs statut`, `rs journal [<id>]`,
 `rs rejouer <id> --complet`, `rs bilan [--appliquer]`, `rs rgpd export|purger`,
 `rs detecter-ats <url>`.
+
+### Dépôt sur les sites carrière : « Remplir pour moi »
+
+Quand aucune adresse mail publique n'existe, la carte propose « Remplir pour moi » :
+
+1. L'Enquête trouve la page carrières ou le formulaire de candidature (gardée seulement
+   si la recherche l'a réellement consultée ; sinon, rien n'est inventé et le lien de
+   recherche reste proposé).
+2. Edge s'ouvre (Playwright, `pip install playwright` ou `pip install -e ".[depot]"` ;
+   Edge est déjà installé sous Windows, rien d'autre à télécharger). Il suit le lien
+   « Candidature spontanée » ou « Postuler » si besoin, remplit prénom, nom, mail,
+   téléphone, ville, école, diplôme et message, et joint le CV et la lettre en PDF.
+   Les champs remplis sont entourés en vert, ceux à compléter en rouge.
+3. Il s'arrête là : **c'est toi qui relis, coches les consentements et cliques sur
+   Envoyer.** Jamais de clic d'envoi automatique, ni de CAPTCHA contourné.
+4. Si le site demande un compte, tu te connectes ou le crées toi-même dans la fenêtre
+   (tu choisis le mot de passe, l'outil ne le voit pas) ; le remplissage reprend sur la
+   page suivante. Les sessions restent dans `donnees/navigateur`.
+5. La carte affiche l'avancement. À la page « Merci pour votre candidature », clique
+   « C'est déposé » : le suivi et les relances démarrent.
+
+L'envoi est réservé dès l'ouverture : jamais deux candidatures pour le même dossier.
 
 Pour un fonctionnement autonome, planifier `rs cycle` deux fois par jour
 (Planificateur de tâches Windows, ou `cron`). Le système ne collecte une

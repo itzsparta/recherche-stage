@@ -64,6 +64,9 @@
   a { color: var(--accent); }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
   .actions .modifie { font-size: 12.5px; color: var(--avert); display: none; }
+  .etat-depot { margin: 8px 0 0; font-weight: 600; }
+  .etat-depot.ok { color: var(--ok); }
+  .etat-depot.avert { color: var(--avert); }
   .depot { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--champ); border: 1px dashed var(--bord); font-size: 14px; }
   .vide { color: var(--doux); text-align: center; padding: 30px; }
   .onglets { display: flex; gap: 4px; margin: 28px 0 14px; border-bottom: 1px solid var(--bord); overflow-x: auto; }
@@ -429,6 +432,7 @@ function afficherFile(elements) {
   const existantes = new Map([...conteneur.children].map(c => [c.dataset.cle, c]));
   elements.forEach((e, i) => {
     const carte = existantes.get(cle(e)) || creerCarte(e);
+    if (e.dossier && e.dossier.etape === "depot") majDepot(carte, e.dossier.depot);
     if (conteneur.children[i] !== carte) conteneur.insertBefore(carte, conteneur.children[i] || null);
   });
   if (!elements.length) conteneur.replaceChildren(el("div", { class: "vide" }, "Rien à traiter. Lance un cycle pour préparer de nouvelles candidatures."));
@@ -519,8 +523,12 @@ function creerCarte(e) {
 
   if (d.etape === "depot") {
     carte.append(el("div", { class: "depot" },
-      "Aucune adresse mail publique : dépose le CV et la lettre (PDF dans le dossier) sur le site de l'entreprise. ",
-      el("a", { href: d.recherche, target: "_blank", rel: "noreferrer" }, "Chercher sa page carrières ↗")));
+      "Aucune adresse mail publique : « Remplir pour moi » ouvre sa page carrières, remplit le formulaire et joint le CV et la lettre. "
+      + "Tu relis, puis tu cliques toi-même sur Envoyer. ",
+      d.page_carriere ? el("a", { href: d.page_carriere, target: "_blank", rel: "noreferrer" }, "Sa page carrières ↗")
+        : el("a", { href: d.recherche, target: "_blank", rel: "noreferrer" }, "Chercher sa page carrières ↗"),
+      el("p", { class: "etat-depot", hidden: true })));
+    majDepot(carte, d.depot);
   }
   if (d.presentiel)
     carte.append(el("div", { class: "depot" }, `À déposer en main propre (${d.presentiel.raison})`,
@@ -531,9 +539,12 @@ function creerCarte(e) {
   const bouton = (texte, classe, fn) => el("button", { class: classe, onclick: fn }, texte);
   for (const a of e.actions) {
     if (a === "valider") actions.append(bouton("Valider", "principal", () => agir(carte, { action: "valider", dossier: d.id, ...valeurs(champs) })));
-    if (a === "deposer") actions.append(bouton("C'est déposé", "principal", () => tiroir(carte, {
+    if (a === "remplir") actions.append(bouton("Remplir pour moi", "principal", () => agir(carte, { action: "remplir", dossier: d.id }, false)
+      .then(() => { setTimeout(suivreCycle, 300); setTimeout(suivreDepots, 3000); })));
+    if (a === "deposer") actions.append(bouton("C'est déposé", "", () => tiroir(carte, {
       titre: "Où l'as-tu déposée ?", puces: ["site carrières", "formulaire de contact", "en main propre", "par courrier"],
-      remplacer: true, valeur: "site carrières", libelle: "Enregistrer le dépôt", classe: "principal",
+      remplacer: true, valeur: d.depot && d.depot.etat === "confirme" ? `site carrières (${d.depot.url})` : "site carrières",
+      libelle: "Enregistrer le dépôt", classe: "principal",
     }, preuve => agir(carte, { action: "deposer", dossier: d.id, preuve: `${preuve || "déposée"}, ${new Date().toLocaleDateString("fr-FR")}` }))));
     if (a === "ouvrir") actions.append(bouton("Ouvrir le dossier", "", () => agir(carte, { action: "ouvrir", dossier: d.id }, false)));
     if (a === "fermer") actions.append(bouton("C'est noté, retirer", "", () => agir(carte, { action: "fermer", escalade: e.escalade })));
@@ -551,6 +562,26 @@ function creerCarte(e) {
   actions.append(el("span", { class: "modifie" }, "modifié : tes corrections seront enregistrées"));
   carte.append(actions);
   return carte;
+}
+
+// Avancement du remplissage sur le site carrière (écrit par le processus du navigateur).
+const DEPOT_EN_COURS = ["ouverture", "rempli", "connexion", "captcha", "manque"];
+function majDepot(carte, depot) {
+  const ligne = carte.querySelector(".etat-depot");
+  if (!ligne) return;
+  ligne.hidden = !depot;
+  if (!depot) return;
+  const ferme = !depot.actif && DEPOT_EN_COURS.includes(depot.etat);
+  ligne.className = "etat-depot " + (depot.etat === "confirme" ? "ok" : ["connexion", "captcha", "manque", "erreur"].includes(depot.etat) ? "avert" : "");
+  ligne.textContent = ferme ? "Fenêtre fermée. Si tu as envoyé la candidature, clique « C'est déposé »." : depot.message
+    + (depot.etat === "confirme" ? " Clique « C'est déposé » pour lancer le suivi." : "")
+    + (depot.remplis && depot.remplis.length && DEPOT_EN_COURS.includes(depot.etat) ? ` (${depot.remplis.length} champ(s) rempli(s))` : "");
+}
+let suiviDepots = null;
+async function suivreDepots() {
+  clearTimeout(suiviDepots);
+  const etat = await rafraichir();
+  if (etat.file.some(e => e.dossier && e.dossier.depot && e.dossier.depot.actif)) suiviDepots = setTimeout(suivreDepots, 3000);
 }
 
 function resume(e) {
@@ -1107,6 +1138,7 @@ rafraichir().then(etat => {
   if (etat.consignes) document.getElementById("preferences").open = true;
   afficherReglages(etat.reglages);
   if (etat.cycle.en_cours) suivreCycle();
+  if (etat.file.some(e => e.dossier && e.dossier.depot && e.dossier.depot.actif)) suivreDepots();
   verifier();
 }).catch(err => toast("Serveur injoignable : relancer rs interface", true));
 </script>

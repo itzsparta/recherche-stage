@@ -21,13 +21,15 @@ from .base import Agent
 
 SYSTEME_RECHERCHE = """Tu prépares une candidature de stage. Renseigne-toi sur l'entreprise indiquée :
 activité, projets ou réalisations récentes, actualités des 18 derniers mois, culture affichée,
-et une adresse e-mail publique de recrutement ou de contact professionnel (jamais une adresse personnelle).
+une adresse e-mail publique de recrutement ou de contact professionnel (jamais une adresse personnelle),
+et l'adresse de sa page carrières ou de son formulaire de candidature spontanée (celle du groupe à défaut).
 Appuie chaque information sur une page consultée et cite-la. Si tu ne trouves rien de fiable, dis-le."""
 
 SYSTEME_EXTRACTION = """Tu structures des notes de recherche sur une entreprise.
 N'utilise que ce qui figure dans les notes. Chaque fait reprend une information précise et vérifiable,
 avec pour source l'une des URL de la liste autorisée, à l'identique. Aucune extrapolation, aucun superlatif.
 `contact_email` : seulement une adresse écrite telle quelle dans les notes, sinon chaîne vide.
+`page_carriere` : l'URL de la page carrières ou du formulaire de candidature de l'entreprise, telle quelle, sinon chaîne vide.
 `fiable` : faux si les notes ne permettent pas d'identifier l'entreprise avec certitude (homonymes, rien trouvé)."""
 
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
@@ -47,6 +49,20 @@ class FicheExtraite(BaseModel):
     contact_email: str
     contact_source: str
     fiable: bool
+    page_carriere: str = ""
+
+
+SYSTEME_CARRIERE = """Trouve où déposer une candidature spontanée de stage dans l'entreprise indiquée :
+sa page carrières, son espace candidat ou son formulaire de candidature (ceux du groupe à défaut).
+Donne l'URL exacte de la page la plus directe, consultée réellement. Si tu ne trouves rien de fiable, dis-le."""
+
+SYSTEME_CARRIERE_EXTRACTION = """Extrais des notes l'URL de la page carrières ou du formulaire de candidature
+de l'entreprise, à l'identique, parmi les URL de la liste autorisée ou écrite telle quelle dans les notes.
+Chaîne vide si les notes n'en donnent pas avec certitude."""
+
+
+class PageCarriere(BaseModel):
+    url: str
 
 
 class AgentEnquete(Agent):
@@ -107,7 +123,28 @@ class AgentEnquete(Agent):
         ):
             fiche.contact = email
             fiche.sources.append(extrait.contact_source)
+        fiche.page_carriere = self._url_verifiee(extrait.page_carriere, notes, urls)
         return bool(fiche.faits or fiche.activite)
+
+    @staticmethod
+    def _url_verifiee(url: str, notes: str, urls: list[str]) -> str:
+        """Une URL n'est gardée que si la recherche l'a réellement vue."""
+        url = url.strip()
+        return url if url.startswith(("http://", "https://")) and (url in urls or url in notes) else ""
+
+    def trouver_page_carriere(self, dossier: Dossier) -> str:
+        """Recherche ciblée de la page où déposer la candidature (dossiers enquêtés sans elle)."""
+        o = dossier.offre
+        notes, urls = self.ctx.llm.rechercher(self.nom, SYSTEME_CARRIERE, f"Entreprise : {o.entreprise}\nLieu : {o.lieu}\nFiche : {o.url}")
+        if not urls:
+            return ""
+        extrait = self.ctx.llm.structurer(self.nom, SYSTEME_CARRIERE_EXTRACTION,
+                                          "URL autorisées :\n" + "\n".join(urls) + f"\n\nNOTES :\n{notes}", PageCarriere)
+        url = self._url_verifiee(extrait.url, notes, urls)
+        if url:
+            dossier.fiche_entreprise.page_carriere = url
+            self.tracer(dossier, "page_carriere", {"entreprise": o.entreprise}, {"url": url})
+        return url
 
     def executer(self, dossier: Dossier) -> None:
         o = dossier.offre

@@ -25,6 +25,7 @@ from .agents.scoring import AgentScoring
 from .agents.suivi import AgentSuivi
 from .agents.veille import AgentVeille
 from .canaux.messagerie import Boite, Expediteur
+from .depot import lancement
 from .llm import BudgetEpuise, ErreurLLM, NonConnecte, QuotaEpuise
 from .modeles import Critique, Dossier, Envoi, Statut
 from .reseau import ErreurReseau
@@ -487,6 +488,33 @@ class Orchestrateur:
         self.store.resoudre_escalades(dossier.id, "envoyé manuellement")
         self.store.save(dossier)
         self.mettre_a_jour_excel()
+
+    def preparer_depot(self, dossier_id: str) -> Path:
+        """Dépôt assisté sur le site carrière : trouve la page si l'Enquête ne
+        l'a pas déjà, réserve l'envoi (anti-doublon) et prépare la tâche du
+        navigateur. Le clic « Envoyer » reste à l'utilisateur."""
+        dossier = self._dossier(dossier_id)
+        if dossier.etape_attente != "depot":
+            raise ValueError(f"{dossier.offre.entreprise} n'est pas à déposer.")
+        if self.store.etat_envoi(dossier.id) == "envoye":
+            raise ValueError(f"Candidature chez {dossier.offre.entreprise} déjà enregistrée comme envoyée.")
+        if not dossier.fiche_entreprise.page_carriere:
+            self.progres(f"Recherche de la page carrières de {dossier.offre.entreprise}…")
+            self.activite("enquete", "debut", dossier.offre.entreprise)
+            try:
+                self.enquete.trouver_page_carriere(dossier)
+            except (ErreurLLM, ErreurReseau) as e:
+                self.activite("enquete", "erreur")
+                raise ValueError(f"Recherche de la page carrières impossible : {e}") from e
+            self.activite("enquete", "ok")
+            self.store.save(dossier)
+            if not dossier.fiche_entreprise.page_carriere:
+                raise ValueError(f"Page carrières de {dossier.offre.entreprise} introuvable : utilise « Chercher sa page carrières ».")
+            self.progres(f"  trouvée : {dossier.fiche_entreprise.page_carriere}")
+        self.store.reserver_envoi(dossier.id, "candidature", "formulaire")
+        dossier.tracer("humain", "depot_assiste")
+        self.store.save(dossier)
+        return lancement.preparer(self.ctx, dossier, self.envoi.pieces_jointes(dossier))
 
     def deposer_sur_place(self, dossier_id: str) -> None:
         """La candidature a été apportée en main propre (tournée présentiel).

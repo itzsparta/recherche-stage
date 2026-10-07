@@ -1,6 +1,17 @@
 # Plan : remplissage automatique des sites carrière
 
-Statut : proposition, rien n'est implémenté.
+Statut : étapes 1 et 2 en partie faites (voir « Fait » ci-dessous) ; comptes (étape 3) non commencés.
+
+## Fait
+
+- `FicheEntreprise.page_carriere` : l'Enquête la note, ou une recherche ciblée la trouve au clic.
+- `depot/` : `champs.py` (reconnaissance), `remplisseur.py` (passes répétées, tous les cadres,
+  liens « Candidature spontanée », arrêt avant envoi, détection connexion, CAPTCHA, confirmation),
+  `lancement.py` et `__main__.py` (processus à part, Edge visible, profil persistant).
+- Bouton « Remplir pour moi » et avancement sur la carte ; réservation anti-doublon.
+- Pas encore : adaptateurs par ATS (le générique par libellés sert pour tous), comptes et
+  `keyring`, lecture IMAP du mail de vérification, passage automatique à « envoyée » à la
+  confirmation (aujourd'hui : « C'est déposé » prérempli).
 
 ## Objectif
 

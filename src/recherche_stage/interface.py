@@ -32,6 +32,7 @@ from .modeles import Dossier, Statut
 from .orchestrateur import Orchestrateur
 from .presentiel import itineraires, ordonner, point_connu, point_dossier
 from .canaux.pdf_simple import texte_vers_pdf
+from .depot import lancement
 from .revue import VALIDABLES, ouvrir
 
 PAGE = Path(__file__).resolve().parent / "interface.html"
@@ -45,7 +46,7 @@ class Refus(Exception):
 
 class Application:
     def __init__(self, fabrique: Fabrique, ouvrir: Callable[[str], None] = ouvrir, arriere_plan: bool = True,
-                 chemin_config: str | Path | None = None):
+                 chemin_config: str | Path | None = None, lanceur_depot: Callable[[Path], object] = lancement.lancer):
         self.fabrique = fabrique
         self.chemin_config = chemin_config  # réglages modifiables depuis la page
         self.ctx, self.orch = fabrique()
@@ -53,6 +54,8 @@ class Application:
         self.arriere_plan = arriere_plan
         self.jeton = secrets.token_urlsafe(24)
         self.cycle = self._etat_travail(False, "cycle")
+        self.lanceur_depot = lanceur_depot
+        self.depots: dict[str, object] = {}  # dossier -> processus qui pilote le navigateur
 
     # ------------------------------------------------------------------ état
 
@@ -177,7 +180,19 @@ class Application:
             "precedente": self._version_precedente(d),
             "faits": [{"texte": f.texte, "source": f.source} for f in d.fiche_entreprise.faits],
             "recherche": f"https://duckduckgo.com/?q={quote_plus(o.entreprise + ' recrutement stage candidature')}",
+            "page_carriere": d.fiche_entreprise.page_carriere,
+            "depot": self._etat_depot(d.id) if d.etape_attente == "depot" else None,
         }
+
+    def _depot_actif(self, dossier_id: str) -> bool:
+        processus = self.depots.get(dossier_id)
+        return processus is not None and getattr(processus, "poll", lambda: None)() is None
+
+    def _etat_depot(self, dossier_id: str) -> dict | None:
+        etat = lancement.lire_etat(self.ctx, dossier_id)
+        if etat is not None:
+            etat["actif"] = self._depot_actif(dossier_id)
+        return etat
 
     def _version_precedente(self, d: Dossier) -> dict | None:
         """Textes de la version d'avant (fichiers *_v{n-1}), pour comparer après une réécriture."""
@@ -241,7 +256,7 @@ class Application:
         if d is None:
             return ["fermer"]
         if d.etape_attente == "depot":
-            return ["deposer", "rejeter", "ouvrir"]
+            return ["remplir", "deposer", "rejeter", "ouvrir"]
         if d.etape_attente in VALIDABLES or d.etape_attente.startswith("relance:"):
             if d.documents.version and d.etape_attente in ("critique", "envoi"):
                 return ["valider", "reecrire", "rejeter", "ouvrir"]
@@ -300,6 +315,8 @@ class Application:
             if nom == "rejeter":
                 self.orch.rejeter(dossier.id, str(donnees.get("motif", "")).strip())
                 return "Rejeté."
+            if nom == "remplir":
+                return self._remplir(dossier)
             if nom == "deposer":
                 preuve = str(donnees.get("preuve", "")).strip() or "déposé (interface)"
                 self.orch.marquer_envoye(dossier.id, preuve)
@@ -310,6 +327,27 @@ class Application:
         except ValueError as e:  # correction refusée (placeholder, information hors fiche…)
             raise Refus(str(e)) from e
         raise Refus(f"Action inconnue : {nom}")
+
+    def _remplir(self, dossier: Dossier) -> str:
+        """« Remplir pour moi » : le navigateur s'ouvre sur la page carrières et le
+        formulaire se remplit ; l'utilisateur relit et clique lui-même sur Envoyer."""
+        if not lancement.disponible():
+            raise Refus("Le remplissage automatique a besoin de Playwright. Dans le terminal (venv activé) : "
+                        "pip install playwright — il utilise Edge, déjà installé, rien d'autre à télécharger.")
+        if self._depot_actif(dossier.id):
+            raise Refus("La fenêtre de dépôt est déjà ouverte pour ce dossier.")
+        identifiant, entreprise = dossier.id, dossier.offre.entreprise
+
+        def travail(orch: Orchestrateur) -> Counter:
+            tache = orch.preparer_depot(identifiant)
+            self.depots[identifiant] = self.lanceur_depot(tache)
+            orch.progres(f"Navigateur ouvert pour {entreprise} : il remplit le formulaire et s'arrête avant l'envoi.")
+            return Counter()
+
+        self._lancer(travail, "depot")
+        if dossier.fiche_entreprise.page_carriere:
+            return f"Ouverture de la page carrières de {entreprise}…"
+        return f"Recherche de la page carrières de {entreprise}, puis ouverture du navigateur…"
 
     def _suivre(self, dossier: Dossier, nom: str, donnees: dict) -> str:
         """Actions des onglets « Mes candidatures » et « Tournée »."""

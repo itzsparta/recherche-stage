@@ -99,6 +99,7 @@ class FicheEntreprise(BaseModel):
     siren: str | None = None
     effectif: str | None = None
     secteur: str | None = None
+    page_carriere: str = ""  # page carrières ou formulaire de candidature (pour le dépôt assisté)
 
 
 class Affirmation(BaseModel):
