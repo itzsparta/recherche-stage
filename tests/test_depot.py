@@ -108,6 +108,39 @@ def test_page_introuvable_rien_n_est_invente(app, ctx, orchestrateur, playwright
     app.action({"action": "remplir", "dossier": d["id"]})
     assert "introuvable" in app.cycle["erreur"]
     assert par_entreprise(ctx, "Sans Adresse").fiche_entreprise.page_carriere == ""
+    assert any("écartée" in ligne and "inventee.example" in ligne for ligne in app.cycle["lignes"])  # journal parlant
+    vue = carte(app, "Sans Adresse")["dossier"]["depot"]
+    assert vue["etat"] == "erreur" and "introuvable" in vue["message"]  # visible sur la carte
+
+    # L'utilisateur colle l'adresse lui-même ; le navigateur qui meurt au démarrage est signalé.
+    with pytest.raises(Refus, match="invalide"):
+        app.action({"action": "page_carriere", "dossier": d["id"], "url": "suez.com"})
+    app.action({"action": "page_carriere", "dossier": d["id"], "url": PAGE})
+
+    class Mort:
+        returncode = 1
+
+        def poll(self):
+            return 1
+
+    def lanceur(tache):
+        (tache.parent / lancement.FICHIER_JOURNAL).write_text("Traceback…\nRuntimeError: Aucun navigateur utilisable\n", encoding="utf-8")
+        return Mort()
+
+    app.lanceur_depot = lanceur
+    app.action({"action": "remplir", "dossier": d["id"]})
+    vue = carte(app, "Sans Adresse")["dossier"]["depot"]
+    assert vue["etat"] == "erreur" and "Aucun navigateur utilisable" in vue["message"]
+
+
+def test_adresse_consultee_a_la_barre_pres_ou_repli_sur_une_page_carrieres(ctx, orchestrateur):  # noqa: F811
+    d = par_entreprise(ctx, "Sans Adresse")
+    ctx.llm.recherche = ("Voir le site.", ["https://www.suez.com/fr/rejoignez-nous/", "https://www.suez.com/fr"])
+    ctx.llm.reponses["enquete"] = {"url": "https://suez.com/fr/rejoignez-nous"}
+    assert orchestrateur.enquete.trouver_page_carriere(d) == "https://www.suez.com/fr/rejoignez-nous/"
+    ctx.llm.reponses["enquete"] = {"url": ""}
+    d.fiche_entreprise.page_carriere = ""
+    assert orchestrateur.enquete.trouver_page_carriere(d) == "https://www.suez.com/fr/rejoignez-nous/"
 
 
 # ------------------------------------------------------------ navigateur réel

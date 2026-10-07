@@ -61,6 +61,13 @@ de l'entreprise, à l'identique, parmi les URL de la liste autorisée ou écrite
 Chaîne vide si les notes n'en donnent pas avec certitude."""
 
 
+PAGE_CARRIERE = re.compile(r"carriere|career|recrut|/jobs?\b|emploi|candidat|join-?us|rejoign|talent")
+
+
+def _cle_url(url: str) -> str:
+    return url.split("#")[0].split("://", 1)[-1].removeprefix("www.").rstrip("/").lower()
+
+
 class PageCarriere(BaseModel):
     url: str
 
@@ -128,19 +135,36 @@ class AgentEnquete(Agent):
 
     @staticmethod
     def _url_verifiee(url: str, notes: str, urls: list[str]) -> str:
-        """Une URL n'est gardée que si la recherche l'a réellement vue."""
+        """Une URL n'est gardée que si la recherche l'a réellement vue (à la barre
+        finale, au protocole ou à l'ancre près) ; on rend alors l'adresse consultée."""
         url = url.strip()
-        return url if url.startswith(("http://", "https://")) and (url in urls or url in notes) else ""
+        if not url.startswith(("http://", "https://")):
+            return ""
+        cle = _cle_url(url)
+        for vue in urls:
+            if _cle_url(vue) == cle:
+                return vue
+        return url if url in notes else ""
 
-    def trouver_page_carriere(self, dossier: Dossier) -> str:
+    def trouver_page_carriere(self, dossier: Dossier, progres=lambda ligne: None) -> str:
         """Recherche ciblée de la page où déposer la candidature (dossiers enquêtés sans elle)."""
         o = dossier.offre
+        progres("  recherche web ciblée (page carrières, espace candidat, formulaire)…")
         notes, urls = self.ctx.llm.rechercher(self.nom, SYSTEME_CARRIERE, f"Entreprise : {o.entreprise}\nLieu : {o.lieu}\nFiche : {o.url}")
+        progres(f"  {len(urls)} page(s) consultée(s)" + (" : " + ", ".join(urls[:6]) if urls else ""))
         if not urls:
+            if notes:
+                progres(f"  réponse de la recherche : {notes[:300]}")
             return ""
         extrait = self.ctx.llm.structurer(self.nom, SYSTEME_CARRIERE_EXTRACTION,
                                           "URL autorisées :\n" + "\n".join(urls) + f"\n\nNOTES :\n{notes}", PageCarriere)
         url = self._url_verifiee(extrait.url, notes, urls)
+        if extrait.url and not url:
+            progres(f"  adresse proposée écartée, la recherche ne l'a pas consultée : {extrait.url}")
+        if not url:  # repli : une page consultée dont l'adresse dit clairement « carrières »
+            url = next((u for u in urls if PAGE_CARRIERE.search(u.lower())), "")
+            if url:
+                progres("  repli sur une page consultée dont l'adresse évoque le recrutement")
         if url:
             dossier.fiche_entreprise.page_carriere = url
             self.tracer(dossier, "page_carriere", {"entreprise": o.entreprise}, {"url": url})

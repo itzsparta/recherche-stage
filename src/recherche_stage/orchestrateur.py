@@ -502,19 +502,34 @@ class Orchestrateur:
             self.progres(f"Recherche de la page carrières de {dossier.offre.entreprise}…")
             self.activite("enquete", "debut", dossier.offre.entreprise)
             try:
-                self.enquete.trouver_page_carriere(dossier)
-            except (ErreurLLM, ErreurReseau) as e:
+                self.enquete.trouver_page_carriere(dossier, self.progres)
+            except (ErreurLLM, ErreurReseau, BudgetEpuise) as e:
                 self.activite("enquete", "erreur")
                 raise ValueError(f"Recherche de la page carrières impossible : {e}") from e
             self.activite("enquete", "ok")
             self.store.save(dossier)
             if not dossier.fiche_entreprise.page_carriere:
-                raise ValueError(f"Page carrières de {dossier.offre.entreprise} introuvable : utilise « Chercher sa page carrières ».")
-            self.progres(f"  trouvée : {dossier.fiche_entreprise.page_carriere}")
+                raise ValueError(f"Page carrières de {dossier.offre.entreprise} introuvable : ouvre « Chercher sa page carrières », "
+                                 "puis colle son adresse dans la carte.")
+            self.progres(f"  page retenue : {dossier.fiche_entreprise.page_carriere}")
+        else:
+            self.progres(f"Page carrières de {dossier.offre.entreprise} : {dossier.fiche_entreprise.page_carriere}")
         self.store.reserver_envoi(dossier.id, "candidature", "formulaire")
         dossier.tracer("humain", "depot_assiste")
         self.store.save(dossier)
-        return lancement.preparer(self.ctx, dossier, self.envoi.pieces_jointes(dossier))
+        pieces = self.envoi.pieces_jointes(dossier)
+        self.progres("  pièces jointes : " + (", ".join(p.name for p in pieces) or "aucune (CV introuvable ?)"))
+        return lancement.preparer(self.ctx, dossier, pieces)
+
+    def definir_page_carriere(self, dossier_id: str, url: str) -> None:
+        """Adresse donnée par l'utilisateur (quand la recherche n'a rien trouvé de sûr)."""
+        url = url.strip()
+        if not url.startswith(("http://", "https://")):
+            raise ValueError("Adresse invalide : elle doit commencer par https://")
+        dossier = self._dossier(dossier_id)
+        dossier.fiche_entreprise.page_carriere = url
+        dossier.tracer("humain", "page_carriere")
+        self.store.save(dossier)
 
     def deposer_sur_place(self, dossier_id: str) -> None:
         """La candidature a été apportée en main propre (tournée présentiel).

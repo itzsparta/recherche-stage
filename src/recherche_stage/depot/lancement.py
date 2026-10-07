@@ -13,6 +13,7 @@ from ..agents.base import Contexte
 from ..modeles import Dossier
 
 FICHIER_ETAT = "depot_etat.json"
+FICHIER_JOURNAL = "depot_journal.txt"
 EN_COURS = ("ouverture", "rempli", "connexion", "captcha", "manque")
 
 
@@ -60,5 +61,23 @@ def preparer(ctx: Contexte, dossier: Dossier, pieces: list[Path]) -> Path:
     return tache
 
 
+def ecrire_etat(ctx: Contexte, dossier_id: str, etat: str, message: str) -> None:
+    chemin = ctx.dossier_fichiers(dossier_id) / FICHIER_ETAT
+    chemin.write_text(json.dumps({"etat": etat, "message": message, "url": "", "remplis": [], "manquants": []},
+                                 ensure_ascii=False), encoding="utf-8")
+
+
+def derniere_ligne_journal(ctx: Contexte, dossier_id: str) -> str:
+    """Dernière ligne utile de la sortie du processus du navigateur (erreur au démarrage)."""
+    chemin = ctx.config.dossier_donnees / "dossiers" / dossier_id / FICHIER_JOURNAL
+    try:
+        lignes = [ligne.strip() for ligne in chemin.read_text(encoding="utf-8", errors="replace").splitlines() if ligne.strip()]
+    except OSError:
+        return ""
+    return lignes[-1][:300] if lignes else ""
+
+
 def lancer(tache: Path) -> subprocess.Popen:
-    return subprocess.Popen([sys.executable, "-m", "recherche_stage.depot", str(tache)])
+    # Sortie du processus gardée dans le dossier : en cas d'échec, l'interface en montre la dernière ligne.
+    journal = open(tache.parent / FICHIER_JOURNAL, "w", encoding="utf-8")  # noqa: SIM115 (fermé avec le processus)
+    return subprocess.Popen([sys.executable, "-m", "recherche_stage.depot", str(tache)], stdout=journal, stderr=subprocess.STDOUT)

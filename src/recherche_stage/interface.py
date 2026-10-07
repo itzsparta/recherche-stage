@@ -190,8 +190,14 @@ class Application:
 
     def _etat_depot(self, dossier_id: str) -> dict | None:
         etat = lancement.lire_etat(self.ctx, dossier_id)
-        if etat is not None:
-            etat["actif"] = self._depot_actif(dossier_id)
+        if etat is None:
+            return None
+        etat["actif"] = self._depot_actif(dossier_id)
+        processus = self.depots.get(dossier_id)
+        code = getattr(processus, "returncode", None) if processus is not None and not etat["actif"] else None
+        if code and etat["etat"] in lancement.EN_COURS:  # le processus est mort sans rien écrire
+            ligne = lancement.derniere_ligne_journal(self.ctx, dossier_id)
+            etat["etat"], etat["message"] = "erreur", "Le navigateur s'est arrêté" + (f" : {ligne}" if ligne else ".")
         return etat
 
     def _version_precedente(self, d: Dossier) -> dict | None:
@@ -256,7 +262,7 @@ class Application:
         if d is None:
             return ["fermer"]
         if d.etape_attente == "depot":
-            return ["remplir", "deposer", "rejeter", "ouvrir"]
+            return ["remplir", "deposer", "rejeter", "ouvrir", "page_carriere"]
         if d.etape_attente in VALIDABLES or d.etape_attente.startswith("relance:"):
             if d.documents.version and d.etape_attente in ("critique", "envoi"):
                 return ["valider", "reecrire", "rejeter", "ouvrir"]
@@ -317,6 +323,9 @@ class Application:
                 return "Rejeté."
             if nom == "remplir":
                 return self._remplir(dossier)
+            if nom == "page_carriere":
+                self.orch.definir_page_carriere(dossier.id, str(donnees.get("url", "")))
+                return "Adresse enregistrée : « Remplir pour moi » l'utilisera."
             if nom == "deposer":
                 preuve = str(donnees.get("preuve", "")).strip() or "déposé (interface)"
                 self.orch.marquer_envoye(dossier.id, preuve)
@@ -339,9 +348,14 @@ class Application:
         identifiant, entreprise = dossier.id, dossier.offre.entreprise
 
         def travail(orch: Orchestrateur) -> Counter:
-            tache = orch.preparer_depot(identifiant)
-            self.depots[identifiant] = self.lanceur_depot(tache)
-            orch.progres(f"Navigateur ouvert pour {entreprise} : il remplit le formulaire et s'arrête avant l'envoi.")
+            try:
+                tache = orch.preparer_depot(identifiant)
+                orch.progres("  ouverture du navigateur (Edge, sinon Chrome)…")
+                self.depots[identifiant] = self.lanceur_depot(tache)
+            except Exception as e:  # visible sur la carte, pas seulement dans le journal
+                lancement.ecrire_etat(orch.ctx, identifiant, "erreur", str(e))
+                raise
+            orch.progres(f"Navigateur lancé pour {entreprise} : l'avancement s'affiche sur sa carte.")
             return Counter()
 
         self._lancer(travail, "depot")
@@ -424,7 +438,7 @@ class Application:
             orch.activite = activite
             etat["rapport"] = dict(sorted(travail(orch).items()))
         except Exception as e:  # affiché dans la page plutôt que perdu dans la console
-            etat["erreur"] = f"{type(e).__name__} : {e}"
+            etat["erreur"] = str(e) if isinstance(e, ValueError) else f"{type(e).__name__} : {e}"
             traceback.print_exc()
         finally:
             etat["agent"], etat["en_cours"] = None, False

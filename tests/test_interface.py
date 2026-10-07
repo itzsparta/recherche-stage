@@ -47,7 +47,7 @@ def test_valider_tel_quel_corrige_rejeter_et_deposer(app, ctx):
 
     d = carte(app, "Sans Adresse")["dossier"]
     assert "déposer" in app.action({"action": "valider", "dossier": d["id"]})
-    assert carte(app, "Sans Adresse")["actions"] == ["remplir", "deposer", "rejeter", "ouvrir"]
+    assert carte(app, "Sans Adresse")["actions"] == ["remplir", "deposer", "rejeter", "ouvrir", "page_carriere"]
     app.action({"action": "ouvrir", "dossier": d["id"]})
     assert app.ouverts[-1].endswith(d["id"])
     app.action({"action": "deposer", "dossier": d["id"], "preuve": "site carrières"})

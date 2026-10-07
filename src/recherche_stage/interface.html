@@ -64,7 +64,9 @@
   a { color: var(--accent); }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
   .actions .modifie { font-size: 12.5px; color: var(--avert); display: none; }
-  .etat-depot { margin: 8px 0 0; font-weight: 600; }
+  .etat-depot { margin: 8px 0 0; font-weight: 600; white-space: pre-line; overflow-wrap: anywhere; }
+  .ligne-adresse { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .ligne-adresse input { flex: 1 1 240px; min-width: 0; }
   .etat-depot.ok { color: var(--ok); }
   .etat-depot.avert { color: var(--avert); }
   .depot { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--champ); border: 1px dashed var(--bord); font-size: 14px; }
@@ -528,6 +530,10 @@ function creerCarte(e) {
       d.page_carriere ? el("a", { href: d.page_carriere, target: "_blank", rel: "noreferrer" }, "Sa page carrières ↗")
         : el("a", { href: d.recherche, target: "_blank", rel: "noreferrer" }, "Chercher sa page carrières ↗"),
       el("p", { class: "etat-depot", hidden: true })));
+    const adresse = el("input", { type: "url", placeholder: "https://… (adresse de sa page carrières, si tu la connais)", "aria-label": "Adresse de la page carrières" });
+    adresse.value = d.page_carriere || "";
+    carte.querySelector(".depot").append(el("div", { class: "ligne-adresse" }, adresse,
+      el("button", { onclick: () => agir(carte, { action: "page_carriere", dossier: d.id, url: adresse.value }, false) }, "Utiliser cette adresse")));
     majDepot(carte, d.depot);
   }
   if (d.presentiel)
@@ -1119,8 +1125,8 @@ async function suivreCycle() {
   const etat = await rafraichir();
   if (etat.cycle.en_cours) setTimeout(suivreCycle, 1500);
   else if (etat.cycle.rapport || etat.cycle.erreur) {
-    toast(etat.cycle.erreur ? "Interrompu : voir le journal" : "Terminé", !!etat.cycle.erreur);
-    const noms = { cycle: "Cycle", reecriture: "Réécriture", entretien: "Fiche d'entretien", test: "Test du LLM" };
+    toast(etat.cycle.erreur ? "Interrompu : " + etat.cycle.erreur.slice(0, 220) : "Terminé", !!etat.cycle.erreur);
+    const noms = { cycle: "Cycle", reecriture: "Réécriture", entretien: "Fiche d'entretien", test: "Test du LLM", depot: "Préparation du dépôt" };
     notifier(`${noms[etat.cycle.nature] || "Travail"} terminé`, etat.cycle.erreur ? "Interrompu : voir le journal"
       : `${etat.file.length} élément(s) à traiter.`);
     if (etat.cycle.nature === "cycle") verifier();
