@@ -362,6 +362,16 @@ def test_menu_replie_page_de_choix_et_inscription_a_double_mot_de_passe(navigate
     assert "127.0.0.1" in json.loads((tmp_path / "comptes.json").read_text(encoding="utf-8"))
 
 
+def test_onglet_vide_du_navigateur_ignore(navigateur, site, remplisseur, tmp_path):
+    contexte = navigateur.new_context()
+    contexte.new_page()  # page de travail
+    contexte.new_page()  # onglet vide ouvert par le navigateur au démarrage
+    final = deposer(contexte, f"{site}/carrieres.html", remplisseur, tmp_path / "etat.json", duree_max=4)
+    assert final.url.endswith("/formulaire.html") and "prenom" in remplisseur.remplis.values()  # a suivi « Candidature spontanée »
+    assert len(contexte.pages) == 1  # l'onglet vide a été fermé
+    contexte.close()
+
+
 def test_choix_des_liens():
     assert reco.choisir_lien([{"texte": "Postuler avec LinkedIn"}, {"texte": "Postuler sans compte"}, {"texte": "Postuler"}], set())[
         "texte"] == "Postuler sans compte"

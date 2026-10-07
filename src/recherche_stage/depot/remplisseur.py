@@ -407,6 +407,12 @@ def deposer(contexte, url: str, remplisseur: Remplisseur, chemin_etat: Path, dur
     page = contexte.pages[0] if contexte.pages else contexte.new_page()
     page.goto(url, wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(1500)
+    for autre in contexte.pages:  # onglet vide ouvert au démarrage par le navigateur (Brave) : fermé
+        if autre is not page and not autre.url.startswith("http"):
+            try:
+                autre.close()
+            except Exception:
+                pass
     etat = Etat(url=url)
     confirme: Etat | None = None  # une confirmation vue reste acquise, même si la page change ensuite
     precedent = None
@@ -415,7 +421,10 @@ def deposer(contexte, url: str, remplisseur: Remplisseur, chemin_etat: Path, dur
         pages = [p for p in contexte.pages if not p.is_closed()]
         if not pages:
             break
-        page = pages[-1]  # un lien « Postuler » ouvre parfois un nouvel onglet
+        # Un lien « Postuler » ouvre parfois un nouvel onglet : le plus récent qui montre un site
+        # (pas un onglet vide ou une page du navigateur ouverte en même temps).
+        sites = [p for p in pages if p.url.startswith("http")]
+        page = sites[-1] if sites else pages[-1]
         try:
             remplisseur.refuser_cookies(page)
             etat = remplisseur.passe(page)
