@@ -154,6 +154,7 @@ class Remplisseur:
         self.guide = guide  # guide IA, quand les mots-clés ne suffisent pas
         self.attributions: dict[tuple[str, str], str] = {}  # (cadre, repère du champ) -> clé proposée par le guide IA
         self.demandes: set[tuple[str, str]] = set()  # champs déjà montrés au guide IA (pas deux fois)
+        self.offres_ecartees: dict[str, str] = {}  # adresse de l'offre -> critère qu'elle contredit (avis du guide IA)
         # Sites où « Créer un compte » a déjà été ouvert (nom du site et date, rien d'autre) :
         # la fois suivante, c'est à toi de te connecter.
         self.fichier_comptes = fichier_comptes
@@ -174,8 +175,8 @@ class Remplisseur:
         infos.update({f"question:{q}": f"réponse rédigée à la question « {q} »" for q in self.questions})
         return infos
 
-    def _demander(self, page, liens: list[dict], champs: list[dict]) -> dict | None:
-        """Demande au guide IA ; retient les champs reconnus et renvoie le lien proposé."""
+    def _demander(self, page, liens: list[dict], champs: list[dict], prevu: dict | None = None):
+        """Demande au guide IA ; retient les champs reconnus et les offres hors critères. Renvoie son avis."""
         if not self.guide:
             return None
         try:
@@ -184,10 +185,14 @@ class Remplisseur:
             texte, titre = "", ""
         self.demandes.update((c["cadre"], c["rs"]) for c in champs)
         bandeau(page, "Le guide IA lit la page…")
-        lien, attributions = self.guide.analyser(page.url, titre, texte, liens, champs, self.informations(), journal=journal)
-        for i, cle in attributions.items():
+        avis = self.guide.analyser(page.url, titre, texte, liens, champs, self.informations(), journal=journal, prevu=prevu)
+        if avis is None:
+            return None
+        for i, cle in avis.champs.items():
             self.attributions[(champs[i]["cadre"], champs[i]["rs"])] = cle
-        return lien
+        if avis.hors_criteres:
+            self.offres_ecartees[page.url] = avis.hors_criteres
+        return avis
 
     def _valeur(self, cle: str) -> str | None:
         if cle.startswith("question:"):
@@ -250,6 +255,9 @@ class Remplisseur:
             else:
                 etat.message = ("Le site demande de te connecter ou de créer un compte : fais-le dans la "
                                 "fenêtre (tu choisis le mot de passe), je remplis la suite.")
+        elif not self.formulaire and page.url in self.offres_ecartees:
+            etat.etat, etat.message = "ouverture", (f"Offre écartée, hors de tes critères ({self.offres_ecartees[page.url]}). "
+                                                    "Choisis une autre offre ou la candidature spontanée, je remplirai le formulaire.")
         elif not self.formulaire:
             chemin = " → ".join(self.navigation[-4:])
             etat.etat, etat.message = "ouverture", ("Pas encore de formulaire sur cette page" + (f" (suivi : {chemin})" if chemin else "")
@@ -310,7 +318,7 @@ class Remplisseur:
         descend dans la page, puis suit « Candidature spontanée » / « Postuler »,
         ou à défaut « Carrières » / « Nous rejoindre » (six liens au plus en tout).
         Jamais un bouton d'envoi."""
-        if self.clics >= 8:
+        if self.clics >= 8 or page.url in self.offres_ecartees:
             return False
         self.refuser_cookies(page)
         self.suivis.add(page.url.lower())  # « Carrières » qui renvoie sur la page où l'on est déjà
@@ -331,11 +339,23 @@ class Remplisseur:
                 texte = ""
             if reco.ESPACE_CANDIDAT.search(texte) and self.vers_inscription(page, liens):
                 return True
-            lien = self._demander(page, liens_proposables(liens, self.suivis), [])
+            avis = self._demander(page, liens_proposables(liens, self.suivis), [])
+            lien = avis.lien if avis else None
             if lien is None:
                 journal(f"aucun lien utile sur cette page ; liens vus : {[x['texte'] for x in liens if x['texte']][:25]}")
                 return False
             journal("lien choisi par le guide IA")
+        elif reco.vers_offre(lien):  # « Postuler » sur une offre précise : le guide vérifie lieu, durée, type de stage
+            proposables = liens_proposables(liens, self.suivis)
+            if lien not in proposables:
+                proposables.append(lien)
+            avis = self._demander(page, proposables, [], prevu=lien)
+            if avis and avis.hors_criteres:
+                if avis.lien is None or avis.lien is lien or reco.vers_offre(avis.lien):
+                    return False  # le message de la passe suivante dit pourquoi
+                lien = avis.lien  # la candidature spontanée proposée à la place
+                journal("lien choisi par le guide IA")
+                self.offres_ecartees.pop(page.url, None)
         self.suivis.add((lien.get("href") or reco.normaliser(lien["texte"])).lower())
         self.clics += 1
         self.navigation.append(lien["texte"] or lien.get("href", ""))
@@ -373,7 +393,8 @@ class Remplisseur:
         liens = liens if liens is not None else self._liens(page)
         lien = reco.choisir_inscription(liens)
         if lien is None:
-            lien = self._demander(page, liens_proposables(liens, self.suivis), [])
+            avis = self._demander(page, liens_proposables(liens, self.suivis), [])
+            lien = avis.lien if avis else None
             if lien is None:
                 textes = [x["texte"] for x in liens if x["texte"]][:25]
                 journal(f"aucun lien utile sur cette page ; liens vus : {textes}")

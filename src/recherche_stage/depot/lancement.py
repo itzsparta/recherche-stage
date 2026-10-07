@@ -76,6 +76,28 @@ def valeurs(ctx: Contexte, dossier: Dossier) -> dict[str, str]:
     }
 
 
+def criteres(ctx: Contexte, dossier: Dossier) -> str:
+    """Critères de la recherche, pour que le guide IA écarte une offre hors zone, trop
+    longue ou qui n'est pas un stage (rien sur l'identité)."""
+    try:
+        g = ctx.grille()
+    except RuntimeError:
+        return ""
+    d = g.durs
+    lignes = [f"Entreprise visée : {dossier.offre.entreprise}", f"Type : {g.type_stage or 'stage'} (pas de CDI, CDD, alternance ni emploi)"]
+    if d.lieux:
+        lignes.append(f"Lieux acceptés : {', '.join(d.lieux)}" + ("" if d.accepte_teletravail_complet else " (pas de télétravail complet)"))
+    if d.duree_min_mois or d.duree_max_mois:
+        lignes.append(f"Durée : {d.duree_min_mois or '?'} à {d.duree_max_mois or '?'} mois")
+    if d.disponible_du or d.disponible_au:
+        lignes.append(f"Disponible du {d.disponible_du or '?'} au {d.disponible_au or '?'}")
+    if g.requetes:
+        lignes.append(f"Domaines recherchés : {', '.join(g.requetes[:10])}")
+    if d.mots_exclus:
+        lignes.append(f"À éviter : {', '.join(d.mots_exclus[:10])}")
+    return "\n".join(lignes)
+
+
 def lire_etat(ctx: Contexte, dossier_id: str) -> dict | None:
     chemin = ctx.config.dossier_donnees / "dossiers" / dossier_id / FICHIER_ETAT
     try:
@@ -106,7 +128,7 @@ def preparer(ctx: Contexte, dossier: Dossier, pieces: list[Path]) -> Path:
         # Guide IA : réglages du modèle (jamais de clé : elles restent dans les variables d'environnement).
         "ia": {"llm": ctx.config.llm.model_dump(mode="json"), "base": str(ctx.config.chemin_base),
                "budget": ctx.config.orchestrateur.appels_api_max_par_semaine,
-               "max_appels": ctx.config.depot.guide_ia_max_appels},
+               "max_appels": ctx.config.depot.guide_ia_max_appels, "criteres": criteres(ctx, dossier)},
     }, ensure_ascii=False), encoding="utf-8")
     return tache
 

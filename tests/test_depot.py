@@ -91,6 +91,7 @@ def test_remplir_trouve_la_page_reserve_et_lance_le_navigateur(app, ctx, orchest
     assert tache["url"] == PAGE and tache["valeurs"]["prenom"] and tache["valeurs"]["lettre_texte"]
     assert tache["fichiers"]["lettre_fichier"].endswith(".pdf")
     assert tache["ia"]["max_appels"] == 15 and not any(k in json.dumps(tache["ia"]) for k in ("sk-ant", "AIza"))  # jamais de clé
+    assert "Entreprise visée : Sans Adresse" in tache["ia"]["criteres"] and "Rémi" not in tache["ia"]["criteres"]
     vue = carte(app, "Sans Adresse")["dossier"]
     assert vue["page_carriere"] == PAGE and vue["depot"]["etat"] == "ouverture"
 
@@ -211,6 +212,14 @@ AVENTURE = """<!doctype html><meta charset="utf-8"><form action="/merci.html">
 <label for="c">Où vous écrire ?</label><input id="c"><label for="d">Code promo</label><input id="d">
 <button type="submit">C'est parti</button></form>"""
 
+# Offres précises : le guide IA vérifie lieu et durée avant « Je postule ».
+OFFRE_PARIS = """<!doctype html><meta charset="utf-8"><h1>Stage technicien maintenance</h1><p>Lieu : Paris (75) — Durée : 6 mois</p>
+<button onclick="location='/formulaire.html'">Je postule</button>"""
+OFFRE_LILLE = """<!doctype html><meta charset="utf-8"><h1>Stage technicien maintenance</h1><p>Lieu : Lille (59) — Durée : 2 mois</p>
+<button onclick="location='/formulaire.html'">Je postule</button>"""
+OFFRE_PARIS2 = """<!doctype html><meta charset="utf-8"><h1>Stage chargé d'études</h1><p>Lieu : Paris (75) — Durée : 6 mois</p>
+<button onclick="location='/formulaire.html'">Je postule</button><a href="/rejoindre.html">Une autre idée ? Écrivez-nous</a>"""
+
 
 @pytest.fixture(scope="module")
 def site(tmp_path_factory):
@@ -220,7 +229,8 @@ def site(tmp_path_factory):
                       "accueil.html": ACCUEIL, "carrieres2.html": CARRIERES2, "rejoindre.html": REJOINDRE,
                       "offre.html": OFFRE, "connexion2.html": CONNEXION2, "inscription.html": INSCRIPTION,
                       "menu.html": MENU, "choix.html": CHOIX, "inscription2.html": INSCRIPTION2,
-                      "maison.html": MAISON, "aventure.html": AVENTURE}.items():
+                      "maison.html": MAISON, "aventure.html": AVENTURE,
+                      "offre_paris.html": OFFRE_PARIS, "offre_lille.html": OFFRE_LILLE, "offre_paris2.html": OFFRE_PARIS2}.items():
         (racine / nom).write_text(html, encoding="utf-8")
     class Silencieux(SimpleHTTPRequestHandler):
         def log_message(self, *args):
@@ -456,3 +466,37 @@ def test_guide_ia_construit_depuis_la_tache(tmp_path):
           "budget": 600, "max_appels": 15}
     assert isinstance(construire(ia), Guide)
     assert construire({**ia, "max_appels": 0}) is None and construire(None) is None  # désactivé dans les Réglages
+
+
+def test_guide_ia_ecarte_une_offre_hors_criteres(navigateur, site, remplisseur):
+    from conftest import FauxLLM
+
+    from recherche_stage.depot.guide import AGENT, Guide
+
+    def verifier(contenu, schema):
+        liens = contenu.split("LIENS ET BOUTONS :")[1].split("CHAMPS DU FORMULAIRE")[0].strip().splitlines()
+        numero = {ligne.split(". ", 1)[1].split(" -> ")[0]: int(ligne.split(".")[0]) for ligne in liens}
+        if "Paris (75)" in contenu:
+            return {"hors_criteres": "lieu : Paris (75), hors Hauts-de-France ; durée 6 mois au lieu de 2 à 3",
+                    "lien": numero.get("Une autre idée ? Écrivez-nous")}
+        return {"lien": numero["Je postule"]}
+
+    llm = FauxLLM({AGENT: verifier})
+    remplisseur.guide = Guide(llm, max_appels=5, criteres="Lieux acceptés : Hauts-de-France\nDurée : 2 à 3 mois")
+    page = navigateur.new_page()
+    page.goto(f"{site}/offre_paris.html")
+    assert remplisseur.passe(page).etat == "ouverture"
+    assert not remplisseur.vers_formulaire(page) and page.url.endswith("/offre_paris.html")  # « Je postule » pas cliqué
+    etat = remplisseur.passe(page)
+    assert "Offre écartée" in etat.message and "Paris" in etat.message
+    assert not remplisseur.vers_formulaire(page) and llm.nb(AGENT) == 1  # pas de nouvel appel, toujours pas de clic
+    assert "Hauts-de-France" in llm.appels[0][1] and "Je postule" in llm.appels[0][1]  # critères et bouton prévu envoyés
+
+    page.goto(f"{site}/offre_paris2.html")  # hors critères, mais un lien vers la candidature libre : suivi
+    remplisseur.passe(page)
+    assert remplisseur.vers_formulaire(page) and page.url.endswith("/rejoindre.html")
+
+    page.goto(f"{site}/offre_lille.html")  # dans les critères : « Je postule » confirmé
+    remplisseur.passe(page)
+    assert remplisseur.vers_formulaire(page) and page.url.endswith("/formulaire.html")
+    assert reco.choisir_lien([{"texte": "Postuler"}, {"texte": "Candidature spontanée"}], set())["texte"] == "Candidature spontanée"

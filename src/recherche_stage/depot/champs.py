@@ -38,6 +38,7 @@ CONFIRMATION = re.compile(
 # Liens ou boutons qui mènent au formulaire (jamais un bouton d'envoi).
 VERS_FORMULAIRE = re.compile(r"candidature spontanee|candidater|candidatez|postul(er|ez|e)\b|deposer (un|mon|votre) cv|apply( now)?$"
                              r"|spontaneous")
+SPONTANEE = re.compile(r"spontane|deposer (un|mon|votre) cv|sans offre|spontaneous|unsolicited")
 # Sur une fenêtre « Postuler avec LinkedIn / en invité / créer un compte » : sans compte d'abord.
 SANS_COMPTE = re.compile(r"sans (creer de |creer un |)compte|en tant qu.invite|\binvite\b|guest|candidature (rapide|express)")
 # Options qui passeraient par un autre site : jamais.
@@ -154,6 +155,8 @@ def choisir_lien(liens: list[dict], deja: set[str]) -> dict | None:
             continue  # un bouton pris dans un formulaire à remplir pourrait l'envoyer
         if SANS_COMPTE.search(texte):
             r = -1
+        elif SPONTANEE.search(texte):
+            r = -0.5  # la candidature spontanée avant le « Postuler » d'une offre précise
         elif VERS_FORMULAIRE.search(texte):
             r = 0
         elif VERS_CARRIERES.search(texte):
@@ -167,6 +170,13 @@ def choisir_lien(liens: list[dict], deja: set[str]) -> dict | None:
         if r < rang:
             meilleur, rang = lien, r
     return meilleur
+
+
+def vers_offre(lien: dict) -> bool:
+    """« Postuler » / « Je postule » qui n'est pas la candidature spontanée : il mène à une
+    offre précise, à vérifier au regard des critères avant de la suivre."""
+    texte = normaliser(lien.get("texte", ""))
+    return bool((VERS_FORMULAIRE.search(texte) or SANS_COMPTE.search(texte)) and not SPONTANEE.search(texte))
 
 
 def choisir_inscription(liens: list[dict]) -> dict | None:

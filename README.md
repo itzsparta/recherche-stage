@@ -185,6 +185,10 @@ Quand aucune adresse mail publique n'existe, la carte propose « Remplir pour mo
    les noms des informations disponibles. Avec `fournisseur: claude_code`, il passe par ton
    abonnement. Réglages → « Guide IA du remplissage : appels par dépôt » (15 par défaut,
    0 pour le désactiver) ; chaque appel compte dans le budget hebdomadaire.
+   Il reçoit aussi tes critères (zone, durée, dates, type de stage, domaines ; jamais ton
+   identité) : avant de cliquer « Postuler » sur une offre précise, il vérifie lieu, durée et
+   contrat. Une offre qui en contredit un est écartée (la carte dit pourquoi), et la
+   candidature spontanée passe toujours avant une offre précise.
 3. Il s'arrête là : **c'est toi qui relis, coches les consentements et cliques sur
    Envoyer.** Jamais de clic d'envoi automatique, ni de CAPTCHA contourné.
 4. Si le site demande un compte, la première fois il ouvre « Créer un compte » et remplit
