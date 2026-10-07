@@ -103,7 +103,7 @@ def test_cycle_et_validation_tiennent_le_tableau(ctx, classeur):
     o = Orchestrateur(ctx, [FauxSource("jobteaser", [offre()])], FauxExpediteur(), rng=random.Random(0), dormir=lambda s: None)
     o.progres = affiche.append
     o.cycle()
-    assert "Tableau Excel : 0 ligne(s) ajoutée(s), 0 mise(s) à jour" in affiche  # rien de validé encore
+    assert f"Tableau Excel ({classeur}) : 0 ligne(s) ajoutée(s), 0 mise(s) à jour" in affiche  # rien de validé encore
     [d] = ctx.store.lister()
     o.valider(d.id)
     o.cycle(collecter=False)

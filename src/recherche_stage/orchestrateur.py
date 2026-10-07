@@ -269,7 +269,7 @@ class Orchestrateur:
             message = f"Tableau Excel non mis à jour : {e}"
             self.store.journaliser(self.nom, "excel_erreur", details={"erreur": str(e)})
         else:
-            message = f"Tableau Excel : {ajoutees} ligne(s) ajoutée(s), {maj} mise(s) à jour"
+            message = f"Tableau Excel ({chemin}) : {ajoutees} ligne(s) ajoutée(s), {maj} mise(s) à jour"
             self.store.journaliser(self.nom, "excel", details={"ajoutees": ajoutees, "mises_a_jour": maj})
         self.progres(message)
         return message
