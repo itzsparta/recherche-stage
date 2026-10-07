@@ -112,3 +112,35 @@ def test_cycle_et_validation_tiennent_le_tableau(ctx, classeur):
 
     ctx.config.suivi.excel = str(classeur.with_name("absent.xlsx"))
     assert "non mis à jour" in o.mettre_a_jour_excel()  # signalé, sans faire tomber le cycle
+
+
+def test_tableau_a_liste_a_envoyer_noms_lieux_et_activite(tmp_path):
+    """Tableau avec « À envoyer » dans la liste, nom écrit à la main, et lignes
+    écrites par une ancienne version (code NAF, code postal, nom en double)."""
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Suivi candidatures"])
+    ws.append([])
+    ws.append(["Entreprise", "Activité", "Lieu", "Contact", "Date d'envoi", "Statut", "Notes"])
+    ws.append(["Turbinor", "Constructeur éolien", "Berry-au-Bac (02)", None, None, "À envoyer", None])
+    ws.append(["EAU CLAIRE (EAU CLAIRE)", "71.12B", "SAINT-QUENTIN (02100)", "rh@eau.fr", date(2026, 10, 6), "À envoyer", None])
+    statuts = DataValidation(type="list", formula1='"À envoyer,Envoyée,Relancée,Entretien,Acceptée,Refusée"')
+    ws.add_data_validation(statuts)
+    statuts.add("F4:F60")
+    chemin = tmp_path / "suivi.xlsx"
+    wb.save(chemin)
+
+    envoyee = dossier(entreprise="EAU CLAIRE (EAU CLAIRE)", lieu="SAINT-QUENTIN (02100)", contact_email="rh@eau.fr")
+    envoyee.fiche_entreprise.secteur = "71.12B"
+    meme = dossier(Statut.validee, entreprise="TURBINOR FRANCE (TURBINOR FRANCE SAS)", lieu="LAON (02000)")
+    autre_site = dossier(Statut.validee, entreprise="TURBINOR FRANCE SAS", lieu="VILLENEUVE-D'ASCQ (59650)")
+    autre_site.offre.secteur = "28.11Z"
+    assert mettre_a_jour(chemin, [envoyee, meme, autre_site]) == (1, 2)
+
+    ws = load_workbook(chemin).active
+    assert [c.value for c in ws[5]][:3] == ["EAU CLAIRE", "Ingénierie, études techniques", "Saint-Quentin (02)"]
+    assert ws["F5"].value == "Envoyée"  # et non « À envoyer »
+    assert ws["A4"].value == "Turbinor" and ws["C4"].value == "Berry-au-Bac (02)"  # saisi à la main : intact
+    assert ws["F4"].value == "À envoyer"
+    assert [c.value for c in ws[6]][:3] == ["TURBINOR FRANCE SAS", "Fabrication de moteurs et turbines", "Villeneuve-d'Ascq (59)"]
+    assert ws["G6"].value == "Même entreprise que la ligne 4 (Turbinor) ?"

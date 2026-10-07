@@ -23,6 +23,7 @@ from pathlib import Path
 
 from .hachage import id_dossier
 from .modeles import Dossier, Statut
+from .naf import libelle as libelle_naf
 from .presentiel import texte_excel
 
 # Champ → intitulés de colonne reconnus (après normalisation : minuscules,
@@ -137,9 +138,55 @@ def _choisir(valeurs: list[str], mots: tuple[str, ...], defaut: str) -> str:
     for mot in mots:
         for v in valeurs:
             n = _norm(v)
-            if mot in n and not (mot in ("retenu", "valide", "positi") and ("non" in n.split() or "refus" in n)):
-                return v
+            if not re.search(rf"\b{re.escape(mot)}", n):
+                continue
+            if mot in ("retenu", "valide", "positi") and ("non" in n.split() or "refus" in n):
+                continue
+            if n.startswith("a ") and not mot.startswith("a "):
+                continue  # « À envoyer » n'est pas « Envoyée » : une tâche à faire, pas un état atteint
+            return v
     return defaut
+
+
+# Mots sans valeur pour reconnaître une entreprise (« NORDEX FRANCE SAS » est « Nordex »).
+GENERIQUES = {"sa", "sas", "sasu", "sarl", "eurl", "snc", "sca", "scop", "france", "groupe", "group", "societe",
+              "et", "de", "du", "des", "la", "le", "les", "the"}
+PETITS_MOTS = {"de", "du", "des", "la", "le", "les", "en", "sur", "sous", "et", "aux", "au", "d", "l", "a", "lez", "les"}
+
+
+def _coeur(nom) -> str:
+    """Nom réduit à l'essentiel, pour reconnaître une entreprise écrite autrement."""
+    sans_parentheses = re.sub(r"\(.*?\)", " ", str(nom or ""))
+    return " ".join(m for m in _norm(sans_parentheses).split() if len(m) > 1 and m not in GENERIQUES)
+
+
+def nom_entreprise(nom: str) -> str:
+    """« ADRE EAU (ADRE EAU) » → « ADRE EAU » ; une parenthèse utile (sigle, marque) reste."""
+    m = re.match(r"^(.*?)\s*\((.*)\)\s*$", nom or "")
+    if not m:
+        return nom or ""
+    dehors, dedans = _coeur(m.group(1)), _coeur(m.group(2))
+    if dehors and dedans and (dehors == dedans or dedans.startswith(dehors) or dehors.startswith(dedans)):
+        return m.group(1).strip()
+    return nom
+
+
+def _departement(lieu) -> str:
+    m = re.search(r"\((97\d|\d[\dAB])\d*\)", str(lieu or ""))
+    return m.group(1) if m else ""
+
+
+def lieu_lisible(lieu: str) -> str:
+    """« SAINT-QUENTIN (02100) » → « Saint-Quentin (02) », comme on l'écrit à la main."""
+    m = re.match(r"^(.*?)\s*\((\d{5})\)\s*$", lieu or "")
+    if not m:
+        return lieu or ""
+    ville, code = m.group(1).strip(), m.group(2)
+    if ville == ville.upper():
+        morceaux = re.split(r"([\s\-'’])", ville.lower())
+        ville = "".join(x if (i and x in PETITS_MOTS) or not x.strip() else x[:1].upper() + x[1:]
+                        for i, x in enumerate(morceaux))
+    return f"{ville} ({code[:3] if code.startswith('97') else code[:2]})"
 
 
 def _etat(d: Dossier) -> str | Statut:
@@ -159,10 +206,10 @@ def valeurs(d: Dossier) -> dict[str, object]:
     canal = {"email": "Mail", "formulaire": "Site de l'entreprise", "plateforme": o.source}.get(d.envoi.canal or "", "")
     envoi = d.envoi.horodatage
     return {
-        "entreprise": o.entreprise,
+        "entreprise": nom_entreprise(o.entreprise),
         "poste": o.intitule,
-        "lieu": o.lieu,
-        "secteur": d.fiche_entreprise.secteur or "",
+        "lieu": lieu_lisible(o.lieu),
+        "secteur": libelle_naf(d.fiche_entreprise.secteur or o.secteur or ""),
         "type": "Spontanée" if o.type == "spontanee" else "Offre",
         "canal": canal,
         "contact": d.envoi.destinataire if d.envoi.canal == "email" else (o.contact_email or d.fiche_entreprise.contact or ""),
@@ -239,6 +286,8 @@ def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | No
         return id_dossier(str(entreprise or ""), str(poste or "")) if "poste" in colonnes else _norm(entreprise)
 
     existantes: dict[str, int] = {}
+    coeurs: dict[tuple[str, str], int] = {}  # (nom réduit, département) -> ligne, pour les noms écrits autrement
+    homonymes: dict[str, list[tuple[int, str]]] = {}  # nom réduit -> lignes, pour signaler une même entreprise
     derniere = ligne_entete
     for ligne in range(ligne_entete + 1, ws.max_row + 1):
         entreprise = ws.cell(ligne, colonnes["entreprise"]).value
@@ -247,6 +296,12 @@ def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | No
         derniere = ligne
         poste = ws.cell(ligne, colonnes["poste"]).value if "poste" in colonnes else ""
         existantes.setdefault(cle(entreprise, poste), ligne)
+        lieu = ws.cell(ligne, colonnes["lieu"]).value if "lieu" in colonnes else ""
+        coeurs.setdefault((_coeur(entreprise), _departement(lieu)), ligne)
+        homonymes.setdefault(_coeur(entreprise), []).append((ligne, str(entreprise)))
+    # Lignes reprises par leur nom exact : jamais prises par un nom approché.
+    prises = {existantes[cle(d.offre.entreprise, d.offre.intitule)] for d in a_ecrire
+              if cle(d.offre.entreprise, d.offre.intitule) in existantes}
 
     ajoutees = maj = 0
     for d in sorted(dossiers, key=lambda d: d.envoi.horodatage or datetime.max):
@@ -254,6 +309,13 @@ def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | No
             continue
         champs = valeurs(d)
         ligne = existantes.get(cle(d.offre.entreprise, d.offre.intitule))
+        if ligne is None and "poste" not in colonnes:
+            # « Nordex » saisi à la main = « NORDEX FRANCE (NORDEX FRANCE SAS) », dans le même département
+            ligne = coeurs.get((_coeur(d.offre.entreprise), _departement(d.offre.lieu)))
+            if ligne in prises:
+                ligne = None
+        if ligne is not None:
+            prises.add(ligne)
         nouvelle = ligne is None
         if nouvelle:
             derniere += 1
@@ -267,8 +329,13 @@ def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | No
             ajoutees += 1
         else:
             maj += 1
+        # Valeurs brutes écrites par une version précédente (nom en double, code NAF, code postal) : remplacées.
+        brutes = {"entreprise": d.offre.entreprise, "lieu": d.offre.lieu, "secteur": d.fiche_entreprise.secteur or d.offre.secteur}
         for champ, col in colonnes.items():
             cellule = ws.cell(ligne, col)
+            if champ in brutes and not nouvelle and cellule.value == brutes[champ] and champs[champ]:
+                cellule.value = champs[champ]
+                continue
             if champ == "statut":
                 etat = _etat(d)
                 valeur = _choisir(_liste_deroulante(ws, cellule), MOTS_STATUT[etat], LIBELLES_STATUT[etat])
@@ -284,6 +351,11 @@ def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | No
                 _surligner(cellule)
             if isinstance(valeur, (date, datetime)) and cellule.number_format == "General":
                 cellule.number_format = "DD/MM/YYYY HH:MM" if isinstance(valeur, datetime) else "DD/MM/YYYY"
+        coeur = _coeur(d.offre.entreprise)
+        autres = [(n, nom) for n, nom in homonymes.get(coeur, []) if n != ligne] if coeur else []
+        if autres and "remarques" in colonnes and ws.cell(ligne, colonnes["remarques"]).value in (None, ""):
+            n, nom = autres[0]  # même entreprise ailleurs dans le tableau (autre site) : à toi de voir
+            ws.cell(ligne, colonnes["remarques"]).value = f"Même entreprise que la ligne {n} ({nom}) ?"
 
     for table in ws.tables.values():  # tableau Excel mis en forme : on l'étend aux nouvelles lignes
         debut, fin = table.ref.split(":")
