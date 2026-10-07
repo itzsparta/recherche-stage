@@ -143,6 +143,9 @@ class ParamsDepot(BaseModel):
     """« Remplir pour moi » sur les sites carrière."""
     # brave, edge ou chrome, ou le chemin complet de l'exécutable ; vide : Brave s'il est installé, sinon Edge, sinon Chrome.
     navigateur: str | None = None
+    # Guide IA : quand les mots-clés ne trouvent ni le lien ni le sens d'un champ, Claude lit la page.
+    # Appels au plus par dépôt (chacun compte dans le budget hebdomadaire) ; 0 : désactivé.
+    guide_ia_max_appels: int = 15
 
 
 class EntrepriseATS(BaseModel):

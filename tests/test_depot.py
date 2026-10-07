@@ -90,6 +90,7 @@ def test_remplir_trouve_la_page_reserve_et_lance_le_navigateur(app, ctx, orchest
     tache = json.loads(lances[0].read_text(encoding="utf-8"))
     assert tache["url"] == PAGE and tache["valeurs"]["prenom"] and tache["valeurs"]["lettre_texte"]
     assert tache["fichiers"]["lettre_fichier"].endswith(".pdf")
+    assert tache["ia"]["max_appels"] == 15 and not any(k in json.dumps(tache["ia"]) for k in ("sk-ant", "AIza"))  # jamais de clé
     vue = carte(app, "Sans Adresse")["dossier"]
     assert vue["page_carriere"] == PAGE and vue["depot"]["etat"] == "ouverture"
 
@@ -201,6 +202,15 @@ INSCRIPTION2 = """<!doctype html><meta charset="utf-8"><label for="m">Adresse e-
 <label for="a">Mot de passe</label><input id="a" type="password"><label for="b">Vérifier le mot de passe</label><input id="b" type="password">
 <div role="button" aria-label="Créer un compte" onclick="location='/merci.html'">Créer un compte</div>"""
 
+# Site que les mots-clés ne comprennent pas : le guide IA choisit le lien et reconnaît les champs.
+MAISON = """<!doctype html><meta charset="utf-8"><title>Kilo</title><a href="/accueil.html">Accueil</a>
+<a href="/metiers.html">Nos métiers</a><a href="/aventure.html">Vivre l'aventure</a>
+<button>Tout accepter</button><a href="https://www.linkedin.com/x">Se connecter avec LinkedIn</a>"""
+AVENTURE = """<!doctype html><meta charset="utf-8"><form action="/merci.html">
+<label for="a">Comment vous appelle-t-on ?</label><input id="a"><label for="b">Votre patronyme</label><input id="b">
+<label for="c">Où vous écrire ?</label><input id="c"><label for="d">Code promo</label><input id="d">
+<button type="submit">C'est parti</button></form>"""
+
 
 @pytest.fixture(scope="module")
 def site(tmp_path_factory):
@@ -209,7 +219,8 @@ def site(tmp_path_factory):
                       "merci.html": "<p>Merci pour votre candidature !</p>",
                       "accueil.html": ACCUEIL, "carrieres2.html": CARRIERES2, "rejoindre.html": REJOINDRE,
                       "offre.html": OFFRE, "connexion2.html": CONNEXION2, "inscription.html": INSCRIPTION,
-                      "menu.html": MENU, "choix.html": CHOIX, "inscription2.html": INSCRIPTION2}.items():
+                      "menu.html": MENU, "choix.html": CHOIX, "inscription2.html": INSCRIPTION2,
+                      "maison.html": MAISON, "aventure.html": AVENTURE}.items():
         (racine / nom).write_text(html, encoding="utf-8")
     class Silencieux(SimpleHTTPRequestHandler):
         def log_message(self, *args):
@@ -401,3 +412,47 @@ def test_choix_du_navigateur(tmp_path, monkeypatch):
     monkeypatch.setattr(lancement, "chemins_brave", lambda: [])
     assert lancement.choisi(None) == "" and lancement.libelle_navigateur("") == "Edge, sinon Chrome"
     assert lancement.nom_profil(r"C:\Program Files\BraveSoftware\brave.exe") == "brave"
+
+
+def test_guide_ia_quand_les_mots_cles_ne_trouvent_rien(navigateur, site, remplisseur):
+    from conftest import FauxLLM
+
+    from recherche_stage.depot.guide import AGENT, Guide
+
+    def decider(contenu, schema):
+        lignes = contenu.splitlines()
+        liens = lignes[lignes.index("LIENS ET BOUTONS :") + 1:]
+        if liens[0].strip():
+            numero = next(ligne.split(".")[0] for ligne in liens if "Vivre l'aventure" in ligne)
+            return {"lien": int(numero), "explication": "page qui mène aux candidatures"}
+        champs = {ligne.split(".")[0]: ligne for ligne in lignes if "libelle=" in ligne}
+        sens = {"appelle": "prenom", "patronyme": "nom", "crire": "email", "promo": "mot_de_passe"}
+        # Réponses hors liste (numéro inconnu, information qui n'existe pas) : ignorées par le code.
+        return {"lien": 99, "champs": [{"numero": int(n), "information": v} for n, ligne in champs.items()
+                                       for k, v in sens.items() if k in ligne] + [{"numero": 42, "information": "email"}]}
+
+    llm = FauxLLM({AGENT: decider})
+    remplisseur.guide = Guide(llm, max_appels=5)
+    page = navigateur.new_page()
+    page.goto(f"{site}/maison.html")
+    assert remplisseur.passe(page).etat == "ouverture"
+    assert remplisseur.vers_formulaire(page) and page.url.endswith("/aventure.html")
+    etat = remplisseur.passe(page)
+    assert page.input_value("#a") == "Rémi" and page.input_value("#b") == "Test" and page.input_value("#c") == "remi@example.org"
+    assert page.input_value("#d") == "" and etat.etat == "rempli" and page.url.endswith("/aventure.html")  # jamais envoyé
+    envoye = "\n".join(contenu for _, contenu, _ in llm.appels)
+    proposes = envoye.split("LIENS ET BOUTONS :")[1].split("CHAMPS DU FORMULAIRE")[0]
+    assert "Tout accepter" not in proposes and "LinkedIn" not in proposes  # jamais proposés à l'IA
+    assert "Rémi" not in envoye and "remi@example.org" not in envoye  # l'IA ne voit pas les valeurs du profil
+    remplisseur.passe(page)
+    assert llm.nb(AGENT) == 2  # une page déjà analysée ne l'est pas deux fois
+
+
+def test_guide_ia_construit_depuis_la_tache(tmp_path):
+    from recherche_stage.config import ParamsLLM
+    from recherche_stage.depot.guide import Guide, construire
+
+    ia = {"llm": ParamsLLM(fournisseur="claude_code").model_dump(mode="json"), "base": str(tmp_path / "b.db"),
+          "budget": 600, "max_appels": 15}
+    assert isinstance(construire(ia), Guide)
+    assert construire({**ia, "max_appels": 0}) is None and construire(None) is None  # désactivé dans les Réglages

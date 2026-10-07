@@ -31,6 +31,8 @@ CHAMPS: dict[tuple[str, str], tuple[str, str, str]] = {
     ("presentiel", "effectif_max"): ("Effectif maximal pour un dépôt sur place", "entier", ""),
     ("depot", "navigateur"): ("Navigateur pour « Remplir pour moi »", "texte",
                               "brave, edge ou chrome, ou chemin complet du .exe ; vide : Brave s'il est installé, sinon Edge"),
+    ("depot", "guide_ia_max_appels"): ("Guide IA du remplissage : appels par dépôt", "entier",
+                                       "Claude lit la page quand le robot ne trouve pas ; 0 : désactivé"),
     ("suivi", "excel"): ("Tableau Excel de suivi", "texte", "Chemin complet du fichier .xlsx ; vide : aucun"),
 }
 

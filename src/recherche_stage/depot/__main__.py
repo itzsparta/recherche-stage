@@ -9,8 +9,9 @@ from pathlib import Path
 
 import os
 
+from .guide import construire
 from .lancement import chemins_brave
-from .remplisseur import Etat, Remplisseur, deposer
+from .remplisseur import Etat, Remplisseur, deposer, journal
 
 CANAUX = {"edge": "msedge", "msedge": "msedge", "chrome": "chrome"}
 
@@ -60,7 +61,8 @@ def main(chemin_tache: str) -> int:
         Etat("erreur", "Playwright n'est pas installé : pip install playwright").ecrire(chemin_etat)
         return 1
     comptes = Path(tache["profil_navigateur"]).parent / "comptes_crees.json"  # sites où un compte a été créé
-    remplisseur = Remplisseur(tache["valeurs"], tache["fichiers"], tache.get("questions"), comptes)
+    remplisseur = Remplisseur(tache["valeurs"], tache["fichiers"], tache.get("questions"), comptes,
+                              guide=construire(tache.get("ia"), journal))
     try:
         with sync_playwright() as p:
             contexte = ouvrir_navigateur(p, tache["profil_navigateur"], tache.get("navigateur", ""))

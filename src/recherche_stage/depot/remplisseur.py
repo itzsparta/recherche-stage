@@ -9,6 +9,10 @@ en plusieurs pages, les nouveaux champs sont remplis à leur tour.
 Le bot ne clique jamais sur un bouton d'envoi : seuls les liens qui mènent au
 formulaire (« Candidature spontanée », « Postuler », « Créer un compte ») et le
 refus des cookies peuvent être cliqués. Le mot de passe n'est jamais rempli.
+
+Quand les mots-clés ne trouvent ni lien ni sens à un champ, le guide IA
+(`guide.py`) lit la page et propose un lien ou des correspondances de champs,
+choisis dans des listes déjà filtrées par le code et revérifiées ensuite.
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from . import champs as reco
+from .guide import DESCRIPTIONS, champs_proposables, liens_proposables
 
 # Collecte des champs d'un cadre ; chacun reçoit un repère data-rs pour être retrouvé.
 COLLECTE = r"""
@@ -134,7 +139,7 @@ class Etat:
 
 class Remplisseur:
     def __init__(self, valeurs: dict[str, str], fichiers: dict[str, str], questions: dict[str, str] | None = None,
-                 fichier_comptes: Path | None = None):
+                 fichier_comptes: Path | None = None, guide=None):
         self.valeurs = {k: v for k, v in valeurs.items() if v}
         self.fichiers = {k: v for k, v in fichiers.items() if v and Path(v).exists()}
         self.questions = questions or {}
@@ -146,6 +151,9 @@ class Remplisseur:
         self.formulaire = False  # la dernière passe a vu un formulaire à remplir
         self.inscriptions: set[str] = set()  # sites où « Créer un compte » a été ouvert pendant ce dépôt
         self.derniere_url = ""
+        self.guide = guide  # guide IA, quand les mots-clés ne suffisent pas
+        self.attributions: dict[tuple[str, str], str] = {}  # (cadre, repère du champ) -> clé proposée par le guide IA
+        self.demandes: set[tuple[str, str]] = set()  # champs déjà montrés au guide IA (pas deux fois)
         # Sites où « Créer un compte » a déjà été ouvert (nom du site et date, rien d'autre) :
         # la fois suivante, c'est à toi de te connecter.
         self.fichier_comptes = fichier_comptes
@@ -155,6 +163,31 @@ class Remplisseur:
                 self.comptes = json.loads(Path(fichier_comptes).read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 pass
+
+    def _cle(self, champ: dict) -> str | None:
+        """Clé du champ : par les mots-clés, sinon celle proposée par le guide IA."""
+        return reco.reconnaitre(champ, self.questions) or self.attributions.get((champ.get("cadre", ""), champ.get("rs", "")))
+
+    def informations(self) -> dict[str, str]:
+        """Noms et sens des informations disponibles pour le guide IA (jamais leurs valeurs)."""
+        infos = {cle: sens for cle, sens in DESCRIPTIONS.items() if cle in self.valeurs}
+        infos.update({f"question:{q}": f"réponse rédigée à la question « {q} »" for q in self.questions})
+        return infos
+
+    def _demander(self, page, liens: list[dict], champs: list[dict]) -> dict | None:
+        """Demande au guide IA ; retient les champs reconnus et renvoie le lien proposé."""
+        if not self.guide:
+            return None
+        try:
+            texte, titre = page.inner_text("body", timeout=2000), page.title()
+        except Exception:
+            texte, titre = "", ""
+        self.demandes.update((c["cadre"], c["rs"]) for c in champs)
+        bandeau(page, "Le guide IA lit la page…")
+        lien, attributions = self.guide.analyser(page.url, titre, texte, liens, champs, self.informations(), journal=journal)
+        for i, cle in attributions.items():
+            self.attributions[(champs[i]["cadre"], champs[i]["rs"])] = cle
+        return lien
 
     def _valeur(self, cle: str) -> str | None:
         if cle.startswith("question:"):
@@ -174,7 +207,9 @@ class Remplisseur:
                 collectes.append((cadre, cadre.evaluate(COLLECTE)))
             except Exception:  # cadre détaché ou d'une autre origine bloquée : on passe
                 continue
-        for _, liste in collectes:
+        for cadre, liste in collectes:
+            for c in liste:
+                c["cadre"] = cadre.url
             tous += liste
         if page.url != self.derniere_url:
             self.derniere_url = page.url
@@ -182,6 +217,11 @@ class Remplisseur:
         # Création de compte (mot de passe + confirmation) : on remplit ce qu'on connaît, jamais le mot de passe.
         mots_de_passe = sum(1 for c in tous if c["type"] == "password" and c["visible"])
         self.formulaire = mots_de_passe >= 2 or self.est_formulaire(tous)
+        # Champs que les mots-clés ne comprennent pas, sur un formulaire (ou une page qui en a beaucoup) : le guide IA.
+        inconnus = champs_proposables([c for c in tous if not self._cle(c) and (c["cadre"], c["rs"]) not in self.demandes])
+        if inconnus and (self.formulaire or (not mots_de_passe and len(inconnus) >= 3)):
+            self._demander(page, [], inconnus)
+            self.formulaire = mots_de_passe >= 2 or self.est_formulaire(tous)
         if self.formulaire and mots_de_passe:
             self._noter_compte(page.url)
         if self.formulaire:
@@ -225,7 +265,7 @@ class Remplisseur:
         reconnus (une simple case « newsletter » ou une recherche ne compte pas)."""
         if self.remplis:
             return True
-        cles = [reco.reconnaitre(c, self.questions) for c in champs if c["visible"] or c["type"] == "file"]
+        cles = [self._cle(c) for c in champs if c["visible"] or c["type"] == "file"]
         return "cv" in cles or "lettre_fichier" in cles or len({c for c in cles if c}) >= 2
 
     def _remplir_cadre(self, cadre, liste: list[dict], manquants: list[str]) -> None:
@@ -234,7 +274,7 @@ class Remplisseur:
         for c in liste:
             if c["fait"]:
                 continue
-            cle = reco.reconnaitre(c, self.questions)
+            cle = self._cle(c)
             if c["type"] == "file":
                 # Deux champs « fichier » sans libellé clair : le CV puis la lettre.
                 if cle == "cv" and "cv" in fichiers_mis and len(fichiers_restants) > 1:
@@ -289,10 +329,13 @@ class Remplisseur:
                 texte = reco.normaliser(page.inner_text("body", timeout=2000))
             except Exception:
                 texte = ""
-            if reco.ESPACE_CANDIDAT.search(texte):
-                return self.vers_inscription(page, liens)
-            journal(f"aucun lien utile sur cette page ; liens vus : {[x['texte'] for x in liens if x['texte']][:25]}")
-            return False
+            if reco.ESPACE_CANDIDAT.search(texte) and self.vers_inscription(page, liens):
+                return True
+            lien = self._demander(page, liens_proposables(liens, self.suivis), [])
+            if lien is None:
+                journal(f"aucun lien utile sur cette page ; liens vus : {[x['texte'] for x in liens if x['texte']][:25]}")
+                return False
+            journal("lien choisi par le guide IA")
         self.suivis.add((lien.get("href") or reco.normaliser(lien["texte"])).lower())
         self.clics += 1
         self.navigation.append(lien["texte"] or lien.get("href", ""))
@@ -327,11 +370,15 @@ class Remplisseur:
         hote = urlsplit(page.url).hostname or ""
         if self.formulaire or not hote or hote in self.comptes or hote in self.inscriptions or self.clics >= 10:
             return False
-        lien = reco.choisir_inscription(liens if liens is not None else self._liens(page))
+        liens = liens if liens is not None else self._liens(page)
+        lien = reco.choisir_inscription(liens)
         if lien is None:
-            textes = [x["texte"] for x in (liens or []) if x["texte"]][:25]
-            journal(f"aucun lien utile sur cette page ; liens vus : {textes}")
-            return False
+            lien = self._demander(page, liens_proposables(liens, self.suivis), [])
+            if lien is None:
+                textes = [x["texte"] for x in liens if x["texte"]][:25]
+                journal(f"aucun lien utile sur cette page ; liens vus : {textes}")
+                return False
+            self.suivis.add((lien.get("href") or reco.normaliser(lien["texte"])).lower())
         self.inscriptions.add(hote)
         self.clics += 1
         self.navigation.append(lien["texte"])

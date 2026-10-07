@@ -103,6 +103,10 @@ def preparer(ctx: Contexte, dossier: Dossier, pieces: list[Path]) -> Path:
         # Un profil par navigateur (deux navigateurs ne partagent pas un même profil) ; les sessions y restent.
         "profil_navigateur": str(ctx.config.dossier_donnees / "navigateur" / nom_profil(navigateur)),
         "navigateur": navigateur,
+        # Guide IA : réglages du modèle (jamais de clé : elles restent dans les variables d'environnement).
+        "ia": {"llm": ctx.config.llm.model_dump(mode="json"), "base": str(ctx.config.chemin_base),
+               "budget": ctx.config.orchestrateur.appels_api_max_par_semaine,
+               "max_appels": ctx.config.depot.guide_ia_max_appels},
     }, ensure_ascii=False), encoding="utf-8")
     return tache
 
@@ -126,8 +130,14 @@ def derniere_ligne_journal(ctx: Contexte, dossier_id: str) -> str:
 def lancer(tache: Path) -> subprocess.Popen:
     # Sortie du processus gardée dans le dossier : en cas d'échec, l'interface en montre la dernière ligne.
     journal = open(tache.parent / FICHIER_JOURNAL, "w", encoding="utf-8")  # noqa: SIM115 (fermé avec le processus)
-    # Textes de liens avec accents ou symboles, sous Windows aussi ; le navigateur n'a pas besoin des clés d'API.
-    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    # Textes de liens avec accents ou symboles, sous Windows aussi. Clé d'API Claude transmise seulement si le
+    # guide IA passe par l'API (`fournisseur: claude`) ; avec Claude Code, c'est l'abonnement qui sert.
+    try:
+        fournisseur = json.loads(tache.read_text(encoding="utf-8"))["ia"]["llm"]["fournisseur"]
+    except (OSError, ValueError, KeyError, TypeError):
+        fournisseur = ""
+    ecartees = () if fournisseur == "claude" else ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+    env = {k: v for k, v in os.environ.items() if k not in ecartees}
     env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.Popen([sys.executable, "-m", "recherche_stage.depot", str(tache)], stdout=journal, stderr=subprocess.STDOUT,
                             env=env)

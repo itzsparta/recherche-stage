@@ -177,6 +177,14 @@ Quand aucune adresse mail publique n'existe, la carte propose « Remplir pour mo
    un site d'offres), puis remplit prénom, nom, mail,
    téléphone, ville, école, diplôme et message, et joint le CV et la lettre en PDF.
    Les champs remplis sont entourés en vert, ceux à compléter en rouge.
+   **Guide IA** : quand les mots-clés ne trouvent ni le bon lien ni le sens d'un champ
+   (« Comment vous appelle-t-on ? »), Claude lit la page (adresse, début du texte, liens,
+   libellés des champs) et propose quoi faire. Il ne choisit que dans des listes déjà
+   filtrées par le code (jamais un bouton d'envoi, un mot de passe, un CAPTCHA, « Tout
+   accepter » ou une connexion LinkedIn/Google) et ne voit jamais tes valeurs, seulement
+   les noms des informations disponibles. Avec `fournisseur: claude_code`, il passe par ton
+   abonnement. Réglages → « Guide IA du remplissage : appels par dépôt » (15 par défaut,
+   0 pour le désactiver) ; chaque appel compte dans le budget hebdomadaire.
 3. Il s'arrête là : **c'est toi qui relis, coches les consentements et cliques sur
    Envoyer.** Jamais de clic d'envoi automatique, ni de CAPTCHA contourné.
 4. Si le site demande un compte, la première fois il ouvre « Créer un compte » et remplit
