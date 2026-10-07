@@ -14,12 +14,14 @@ CANAUX = ("msedge", "chrome", None)  # Edge est déjà installé sous Windows : 
 
 def ouvrir_navigateur(playwright, profil: str):
     erreur: Exception | None = None
-    for canal in CANAUX:
-        try:
-            return playwright.chromium.launch_persistent_context(
-                profil, channel=canal, headless=False, accept_downloads=False, no_viewport=True, args=["--start-maximized"])
-        except Exception as e:  # navigateur absent : on essaie le suivant
-            erreur = e
+    for bac_a_sable in (True, False):  # le bac à sable évite l'avertissement --no-sandbox ; repli si refusé
+        for canal in CANAUX:
+            try:
+                return playwright.chromium.launch_persistent_context(
+                    profil, channel=canal, headless=False, chromium_sandbox=bac_a_sable, accept_downloads=False,
+                    no_viewport=True, args=["--start-maximized"])
+            except Exception as e:  # navigateur absent : on essaie le suivant
+                erreur = e
     raise RuntimeError(f"Aucun navigateur utilisable (Edge, Chrome ou Chromium de Playwright) : {erreur}")
 
 

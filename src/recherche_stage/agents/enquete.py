@@ -22,7 +22,8 @@ from .base import Agent
 SYSTEME_RECHERCHE = """Tu prépares une candidature de stage. Renseigne-toi sur l'entreprise indiquée :
 activité, projets ou réalisations récentes, actualités des 18 derniers mois, culture affichée,
 une adresse e-mail publique de recrutement ou de contact professionnel (jamais une adresse personnelle),
-et l'adresse de sa page carrières ou de son formulaire de candidature spontanée (celle du groupe à défaut).
+et l'adresse de sa page carrières ou de son formulaire de candidature spontanée, sur son propre site ou celui
+de son groupe (jamais un site d'offres comme La bonne alternance, Indeed, HelloWork ou France Travail).
 Appuie chaque information sur une page consultée et cite-la. Si tu ne trouves rien de fiable, dis-le."""
 
 SYSTEME_EXTRACTION = """Tu structures des notes de recherche sur une entreprise.
@@ -53,15 +54,33 @@ class FicheExtraite(BaseModel):
 
 
 SYSTEME_CARRIERE = """Trouve où déposer une candidature spontanée de stage dans l'entreprise indiquée :
-sa page carrières, son espace candidat ou son formulaire de candidature (ceux du groupe à défaut).
+sa page carrières, son espace candidat ou son formulaire de candidature, sur le site de l'entreprise ou de son
+groupe (ou l'outil de recrutement qu'il utilise : Workday, SuccessFactors, Taleo, Teamtailor…).
+Pas les sites d'offres ou d'alternance (La bonne alternance, Indeed, HelloWork, Welcome to the Jungle, France Travail,
+APEC, JobTeaser, LinkedIn) ni les annuaires : la candidature doit arriver directement à l'entreprise.
 Donne l'URL exacte de la page la plus directe, consultée réellement. Si tu ne trouves rien de fiable, dis-le."""
 
 SYSTEME_CARRIERE_EXTRACTION = """Extrais des notes l'URL de la page carrières ou du formulaire de candidature
 de l'entreprise, à l'identique, parmi les URL de la liste autorisée ou écrite telle quelle dans les notes.
+Jamais un site d'offres, d'alternance ou un annuaire (La bonne alternance, Indeed, HelloWork, France Travail…).
 Chaîne vide si les notes n'en donnent pas avec certitude."""
 
 
 PAGE_CARRIERE = re.compile(r"carriere|career|recrut|/jobs?\b|emploi|candidat|join-?us|rejoign|talent")
+
+
+# Sites d'offres, d'alternance et annuaires : pas l'endroit où l'entreprise reçoit une candidature de stage.
+SITES_TIERS = (
+    "labonnealternance", "alternance.emploi.gouv", "indeed.", "linkedin.", "welcometothejungle.", "hellowork.", "jobteaser.",
+    "francetravail.", "pole-emploi.", "apec.fr", "monster.", "glassdoor.", "meteojob.", "regionsjob.", "cadremploi.", "jobijoba.",
+    "keljob.", "optioncarriere.", "studentjob.", "letudiant.fr", "1jeune1solution", "annuaire-entreprises.", "societe.com",
+    "pappers.", "pagesjaunes.", "infogreffe.", "manageo.", "verif.com", "wikipedia.", "facebook.", "google.",
+)
+
+
+def site_tiers(url: str) -> bool:
+    hote = url.split("://", 1)[-1].split("/", 1)[0].lower()
+    return any(t in hote for t in SITES_TIERS)
 
 
 def _cle_url(url: str) -> str:
@@ -138,7 +157,7 @@ class AgentEnquete(Agent):
         """Une URL n'est gardée que si la recherche l'a réellement vue (à la barre
         finale, au protocole ou à l'ancre près) ; on rend alors l'adresse consultée."""
         url = url.strip()
-        if not url.startswith(("http://", "https://")):
+        if not url.startswith(("http://", "https://")) or site_tiers(url):
             return ""
         cle = _cle_url(url)
         for vue in urls:
@@ -160,9 +179,10 @@ class AgentEnquete(Agent):
                                           "URL autorisées :\n" + "\n".join(urls) + f"\n\nNOTES :\n{notes}", PageCarriere)
         url = self._url_verifiee(extrait.url, notes, urls)
         if extrait.url and not url:
-            progres(f"  adresse proposée écartée, la recherche ne l'a pas consultée : {extrait.url}")
+            raison = "site d'offres ou annuaire, pas le site de l'entreprise" if site_tiers(extrait.url) else "la recherche ne l'a pas consultée"
+            progres(f"  adresse proposée écartée ({raison}) : {extrait.url}")
         if not url:  # repli : une page consultée dont l'adresse dit clairement « carrières »
-            url = next((u for u in urls if PAGE_CARRIERE.search(u.lower())), "")
+            url = next((u for u in urls if PAGE_CARRIERE.search(u.lower()) and not site_tiers(u)), "")
             if url:
                 progres("  repli sur une page consultée dont l'adresse évoque le recrutement")
         if url:

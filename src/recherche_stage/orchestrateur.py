@@ -17,7 +17,7 @@ from . import controles
 from .agents.apprentissage import PREFIXE_MOTIF, AgentApprentissage
 from .agents.base import Contexte
 from .agents.critique import AgentCritique
-from .agents.enquete import AgentEnquete
+from .agents.enquete import AgentEnquete, site_tiers
 from .agents.envoi import AgentEnvoi
 from .agents.profil import AgentProfil
 from .agents.redaction import AgentRedaction
@@ -498,7 +498,12 @@ class Orchestrateur:
             raise ValueError(f"{dossier.offre.entreprise} n'est pas à déposer.")
         if self.store.etat_envoi(dossier.id) == "envoye":
             raise ValueError(f"Candidature chez {dossier.offre.entreprise} déjà enregistrée comme envoyée.")
-        if not dossier.fiche_entreprise.page_carriere:
+        fiche = dossier.fiche_entreprise
+        donnee_par_toi = any(h.agent == "humain" and h.action == "page_carriere" for h in dossier.historique)
+        if fiche.page_carriere and site_tiers(fiche.page_carriere) and not donnee_par_toi:
+            self.progres(f"Adresse écartée (site d'offres, pas celui de l'entreprise) : {fiche.page_carriere}")
+            fiche.page_carriere = ""
+        if not fiche.page_carriere:
             self.progres(f"Recherche de la page carrières de {dossier.offre.entreprise}…")
             self.activite("enquete", "debut", dossier.offre.entreprise)
             try:

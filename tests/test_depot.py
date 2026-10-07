@@ -242,3 +242,26 @@ def test_connexion_rendue_a_l_utilisateur_puis_confirmation(navigateur, site, re
     final = deposer(contexte, f"{site}/merci.html", remplisseur, chemin, duree_max=2)
     assert final.etat == "confirme" and json.loads(chemin.read_text(encoding="utf-8"))["etat"] == "confirme"
     contexte.close()
+
+
+def test_sites_d_offres_et_alternance_ecartes(ctx, orchestrateur):  # noqa: F811
+    lba = "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/44897984900172/suez-rv-fm"
+    d = par_entreprise(ctx, "Sans Adresse")
+    ctx.llm.recherche = ("Voir La bonne alternance.", [lba, "https://fr.indeed.com/cmp/Suez/jobs"])
+    ctx.llm.reponses["enquete"] = {"url": lba}
+    assert orchestrateur.enquete.trouver_page_carriere(d) == ""  # ni l'adresse proposée, ni le repli
+
+    # Adresse déjà enregistrée par l'ancienne version : écartée, puis nouvelle recherche.
+    orchestrateur.valider(d.id)
+    d = par_entreprise(ctx, "Sans Adresse")
+    d.fiche_entreprise.page_carriere = lba
+    ctx.store.save(d)
+    ctx.llm.recherche = ("Page du groupe.", [PAGE])
+    ctx.llm.reponses["enquete"] = {"url": PAGE}
+    orchestrateur.preparer_depot(d.id)
+    assert par_entreprise(ctx, "Sans Adresse").fiche_entreprise.page_carriere == PAGE
+
+    # Donnée par l'utilisateur lui-même : respectée.
+    orchestrateur.definir_page_carriere(d.id, lba)
+    orchestrateur.preparer_depot(d.id)
+    assert par_entreprise(ctx, "Sans Adresse").fiche_entreprise.page_carriere == lba
