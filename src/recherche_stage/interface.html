@@ -6,168 +6,79 @@
 <title>Recherche de stage</title>
 <link rel="icon" href="data:,">
 <style>
+  /* Couleurs : thème « Harbor Blue » de 21st.dev, adapté (contrastes du mode sombre, couleurs d'état). */
   :root {
-    --fond: #f3f2ee; --carte: #ffffff; --surface: #f8f7f3; --texte: #1b1a17; --doux: #65625a; --pale: #8d8a80;
-    --bord: #e4e1d9; --bord-fort: #d2cec3;
-    --accent: #2c4fc7; --accent-fort: #213ea3; --accent-texte: #ffffff;
-    --ok: #1d7a4a; --non: #b42318; --avert: #9a5b06; --violet: #6b46c1;
-    --champ: #ffffff; --papier: #fffefb;
-    --ombre: 0 1px 2px rgba(28, 25, 15, .05), 0 1px 1px rgba(28, 25, 15, .03);
-    --ombre-haute: 0 12px 32px rgba(28, 25, 15, .16), 0 2px 6px rgba(28, 25, 15, .06);
-    --rayon: 14px;
+    --fond: #f8fafc; --encart: #ffffff; --carte: #ffffff; --surface: #f1f5f9; --survol: #eef2f7;
+    --texte: #0f172a; --texte-menu: #1e293b; --doux: #64748b; --pale: #94a3b8;
+    --bord: #e2e8f0; --bord-fort: #cbd5e1;
+    --primaire: #194391; --primaire-survol: #1d4fa9; --primaire-texte: #ffffff;
+    --accent: #194391; --vif: #4169e1; --secondaire: #dce6f9; --secondaire-texte: #194391;
+    --ok: #15803d; --non: #dc2626; --avert: #b45309; --violet: #6d28d9;
+    --champ: #ffffff; --papier: #fffefa;
+    --ombre: 0 1px 2px rgba(15, 23, 42, .05);
+    --ombre-carte: 0 1px 3px rgba(15, 23, 42, .06), 0 1px 2px rgba(15, 23, 42, .04);
+    --ombre-haute: 0 12px 32px rgba(15, 23, 42, .16), 0 2px 6px rgba(15, 23, 42, .06);
+    --rayon: 12px; --rayon-petit: 8px;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --fond: #131312; --carte: #1c1c1a; --surface: #232321; --texte: #ecebe6; --doux: #a5a298; --pale: #7f7c74;
-      --bord: #2f2e2a; --bord-fort: #403e38;
-      --accent: #8ea7ff; --accent-fort: #aebfff; --accent-texte: #0c1533;
-      --ok: #5cc48c; --non: #f0877b; --avert: #e2a94f; --violet: #b69cf5;
-      --champ: #171716; --papier: #1f1f1c;
-      --ombre: 0 1px 2px rgba(0, 0, 0, .35); --ombre-haute: 0 14px 36px rgba(0, 0, 0, .55);
+      --fond: #0a1020; --encart: #0f172a; --carte: #151f33; --surface: #1e293b; --survol: #1a2436;
+      --texte: #f1f5f9; --texte-menu: #e2e8f0; --doux: #94a3b8; --pale: #64748b;
+      --bord: #243147; --bord-fort: #334155;
+      --primaire: #2d5cc2; --primaire-survol: #3a69d0; --primaire-texte: #ffffff;
+      --accent: #93b4f5; --vif: #60a5fa; --secondaire: #1e2e4d; --secondaire-texte: #c7d7f7;
+      --ok: #4ade80; --non: #f87171; --avert: #fbbf24; --violet: #c4b5fd;
+      --champ: #0f172a; --papier: #131d31;
+      --ombre: 0 1px 2px rgba(0, 0, 0, .3); --ombre-carte: 0 1px 3px rgba(0, 0, 0, .35);
+      --ombre-haute: 0 14px 36px rgba(0, 0, 0, .55);
       color-scheme: dark;
     }
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html { -webkit-text-size-adjust: 100%; }
-  body { margin: 0; background: var(--fond); color: var(--texte); accent-color: var(--accent);
-         font: 15px/1.55 Inter, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", sans-serif;
+  body { margin: 0; background: var(--fond); color: var(--texte); accent-color: var(--primaire);
+         font: 14.5px/1.55 Inter, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", sans-serif;
          -webkit-font-smoothing: antialiased; }
   a { color: var(--accent); text-underline-offset: 2px; text-decoration-thickness: 1px; }
   a:hover { text-decoration-thickness: 2px; }
   .sous { color: var(--doux); font-size: 13px; }
-  h2 { font-size: 15.5px; font-weight: 650; letter-spacing: -.005em; margin: 36px 0 12px; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  h2 { font-size: 16px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+  :focus-visible { outline: 2px solid var(--vif); outline-offset: 2px; }
+  svg { flex: none; }
 
-  /* ------------------------------------------------------------ en-tête */
-  .barre { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--bord);
-           background: color-mix(in srgb, var(--fond) 85%, transparent); backdrop-filter: saturate(1.4) blur(12px);
-           -webkit-backdrop-filter: saturate(1.4) blur(12px); }
-  .barre-int { max-width: 1240px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 10px 32px; flex-wrap: wrap; }
-  .marque { display: flex; align-items: center; gap: 10px; }
-  .logo { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: var(--accent-texte);
-          background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #8b5cf6));
-          box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent); }
-  .logo svg { width: 18px; height: 18px; }
-  h1 { font-size: 16px; font-weight: 700; letter-spacing: -.01em; margin: 0; white-space: nowrap; }
-  .onglets { display: flex; gap: 2px; padding: 3px; background: var(--surface); border: 1px solid var(--bord); border-radius: 12px;
-             overflow-x: auto; scrollbar-width: none; }
-  .onglets::-webkit-scrollbar { display: none; }
-  .onglets button { border: 0; background: none; box-shadow: none; color: var(--doux); border-radius: 9px; min-height: 32px; padding: 4px 12px;
-                    white-space: nowrap; font-weight: 500; gap: 7px; }
-  .onglets button:hover:not(:disabled):not([aria-selected=true]) { color: var(--texte); background: color-mix(in srgb, var(--texte) 5%, transparent); }
-  .onglets button[aria-selected=true] { font-weight: 600; background: var(--carte); color: var(--texte); box-shadow: var(--ombre), 0 0 0 1px var(--bord); }
-  .compte { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; display: inline-grid; place-items: center;
-            font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums;
-            background: color-mix(in srgb, var(--texte) 8%, transparent); color: var(--doux); }
-  .onglets button[aria-selected=true] .compte { background: var(--accent); color: var(--accent-texte); }
-  .onglets .compte.attention { background: var(--avert); color: var(--carte); }
-
-  /* ------------------------------------------------------------ mise en page */
-  .page { max-width: 1240px; margin: 0 auto; padding: 24px 24px 96px; display: grid; grid-template-columns: 316px minmax(0, 1fr);
-          gap: 28px; align-items: start; }
-  .cote { position: sticky; top: 77px; max-height: calc(100vh - 92px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
-          padding: 2px; margin: -2px; scrollbar-width: thin; }
-  main { min-width: 0; }
-  @media (max-width: 1080px) {
-    /* une seule colonne : le cycle et les chiffres, puis la file, puis les préférences et réglages */
-    .page { grid-template-columns: minmax(0, 1fr); gap: 14px; padding-top: 16px; }
-    .cote { display: contents; }
-    .cote > .cycle { order: 1; }
-    .cote > .chiffres { order: 2; }
-    main { order: 3; margin-top: 8px; }
-    .cote > details { order: 4; }
-  }
-
-  /* ------------------------------------------------------------ panneaux et chiffres */
-  .panneau { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 16px; box-shadow: var(--ombre); }
-  details.panneau { padding: 0; }
-  details.panneau > summary { padding: 13px 16px; display: flex; align-items: baseline; gap: 8px; color: var(--texte); font-weight: 600; font-size: 14px; }
-  details.panneau > summary::before { display: none; }
-  details.panneau > summary::after { content: ""; flex: none; align-self: center; margin-left: auto; width: 7px; height: 7px;
-                                     border-right: 2px solid var(--pale); border-bottom: 2px solid var(--pale); transform: translateY(-2px) rotate(45deg); transition: transform .2s; }
-  details.panneau[open] > summary::after { transform: translateY(2px) rotate(225deg); }
-  details.panneau > summary .sous { font-weight: 400; font-size: 12.5px; }
-  .volet { padding: 0 16px 16px; }
-  .volet > p:first-child { margin-top: 0; }
-  .chiffres { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-  .cote .chiffres { grid-template-columns: 1fr 1fr; }
-  @media (max-width: 1080px) { .cote .chiffres { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); } }
-  @media (max-width: 680px) {
-    .cote .chiffres { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .cote .chiffre { padding: 8px 10px; }
-    .cote .chiffre b { font-size: 18px; }
-    .cote .chiffre span { font-size: 11.5px; }
-  }
-  .chiffre { background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; padding: 11px 14px; box-shadow: var(--ombre); }
-  .chiffre b { display: block; font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; font-variant-numeric: tabular-nums; }
-  .chiffre span { display: block; color: var(--doux); font-size: 12.5px; line-height: 1.35; }
-  .chiffre.fort { background: color-mix(in srgb, var(--accent) 8%, var(--carte)); border-color: color-mix(in srgb, var(--accent) 35%, var(--carte)); }
-  .chiffre.fort b { color: var(--accent); }
-
-  /* ------------------------------------------------------------ cycle */
-  .cycle { display: flex; flex-direction: column; gap: 12px; }
-  .options { display: flex; flex-direction: column; gap: 6px; }
-  label.case { display: inline-flex; align-items: center; gap: 8px; color: var(--texte); font-size: 14px; cursor: pointer; }
-  label.case input { width: 16px; height: 16px; margin: 0; }
-  #cycle-etat:empty { display: none; }
-  #mode { padding-top: 12px; border-top: 1px solid var(--bord); font-size: 12.5px; line-height: 1.45; }
-  #lancer:disabled { opacity: 1; background: color-mix(in srgb, var(--accent) 55%, var(--carte)); border-color: transparent; cursor: progress; }
-  #lancer:disabled svg { display: none; }
-  #lancer:disabled::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor;
-                             border-right-color: transparent; animation: tourne .8s linear infinite; }
-  .verifs { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12.5px; align-items: center; }
-  .verifs:empty { display: none; }
-  .verif { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 99px;
-           background: var(--surface); border: 1px solid var(--bord); line-height: 1.3; }
-  .verif::before { flex: none; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
-                   font-size: 10px; font-weight: 800; color: var(--carte); }
-  .verif.ok::before { content: "✓"; background: var(--ok); }
-  .verif.attention::before { content: "!"; background: var(--avert); }
-  .verif.bloque::before { content: "✕"; background: var(--non); }
-  .verif.bloque, .verif.attention { cursor: help; }
-  .verifs button { min-height: 26px; padding: 2px 10px; font-size: 12.5px; border-radius: 99px; }
-  .verifs-details { margin: 2px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--doux); }
-  .etapes { display: grid; gap: 7px; }
-  .etape { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 10px; font-size: 12.5px; color: var(--doux); }
-  .etape .barre { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--texte) 8%, transparent); overflow: hidden; }
-  .etape .barre i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--accent); transition: width .3s; }
-  .etape.fait { color: var(--ok); }
-  .etape.fait .barre i { width: 100%; background: var(--ok); }
-  .etape.encours { color: var(--texte); font-weight: 600; }
-  @media (max-width: 1080px) {
-    .etapes { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-    .etape { grid-template-columns: minmax(0, 1fr); gap: 4px; font-size: 11.5px; }
-  }
-  pre.journal { margin: 8px 0 0; max-height: 240px; overflow: auto; background: var(--surface); border: 1px solid var(--bord);
-                border-radius: 10px; padding: 10px 12px; font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; }
-
-  /* ------------------------------------------------------------ boutons et champs */
-  button, a.bouton { font: inherit; font-size: 14px; font-weight: 500; line-height: 1.25; min-height: 36px; padding: 6px 14px; border-radius: 9px;
-                     display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; text-decoration: none;
-                     border: 1px solid var(--bord-fort); background: var(--carte); color: var(--texte); box-shadow: 0 1px 1px rgba(0, 0, 0, .03);
-                     transition: background .15s, border-color .15s, color .15s, box-shadow .15s; }
-  button:hover:not(:disabled), a.bouton:hover { background: var(--surface); border-color: var(--pale); }
+  /* ------------------------------------------------------------ boutons et champs (style shadcn/ui) */
+  button, a.bouton, .deroulant > summary {
+    font: inherit; font-size: 14px; font-weight: 500; line-height: 1.25; min-height: 36px; padding: 6px 14px; border-radius: var(--rayon-petit);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; text-decoration: none;
+    border: 1px solid var(--bord); background: var(--carte); color: var(--texte); box-shadow: var(--ombre);
+    transition: background .15s, border-color .15s, color .15s, box-shadow .15s; }
+  button:hover:not(:disabled), a.bouton:hover { background: var(--survol); }
   button:disabled { opacity: .5; cursor: not-allowed; }
-  button svg { width: 15px; height: 15px; flex: none; }
-  button.principal { background: var(--accent); border-color: var(--accent); color: var(--accent-texte); font-weight: 600;
-                     box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 45%, transparent); }
-  button.principal:hover:not(:disabled) { background: var(--accent-fort); border-color: var(--accent-fort); }
+  button svg, a.bouton svg { width: 16px; height: 16px; }
+  button.principal, .deroulant > summary.principal { background: var(--primaire); border-color: transparent; color: var(--primaire-texte);
+                     box-shadow: 0 1px 2px color-mix(in srgb, var(--primaire) 40%, transparent); }
+  button.principal:hover:not(:disabled), .deroulant > summary.principal:hover { background: var(--primaire-survol); }
+  button.secondaire { background: var(--secondaire); border-color: transparent; color: var(--secondaire-texte); box-shadow: none; }
+  button.secondaire:hover:not(:disabled) { background: color-mix(in srgb, var(--secondaire) 80%, var(--primaire)); }
+  button.fantome { background: transparent; border-color: transparent; box-shadow: none; }
+  button.fantome:hover:not(:disabled) { background: var(--survol); }
   button.danger { color: var(--non); }
-  button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--non) 8%, var(--carte)); border-color: color-mix(in srgb, var(--non) 45%, var(--carte)); }
-  button.grand { width: 100%; min-height: 42px; font-size: 15px; }
+  button.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--non) 9%, var(--carte)); }
+  button.petit, a.bouton.petit { min-height: 30px; padding: 3px 10px; font-size: 13px; }
+  button.pilule { border-radius: 99px; }
+  button.icone-seule { width: 36px; padding: 0; }
   input[type=text], input[type=url], textarea, select { font: inherit; font-size: 14px; color: var(--texte); background: var(--champ);
-                     border: 1px solid var(--bord-fort); border-radius: 10px; padding: 8px 11px; transition: border-color .15s, box-shadow .15s; }
+                     border: 1px solid var(--bord-fort); border-radius: var(--rayon-petit); padding: 8px 11px; transition: border-color .15s, box-shadow .15s; }
   input[type=text], input[type=url], textarea { width: 100%; }
   select { min-height: 36px; padding: 6px 10px; cursor: pointer; }
   input:hover, textarea:hover, select:hover { border-color: var(--pale); }
-  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--vif); box-shadow: 0 0 0 3px color-mix(in srgb, var(--vif) 22%, transparent); }
   input[readonly], textarea[readonly] { background: var(--surface); }
   textarea { display: block; resize: vertical; line-height: 1.6; }
-  textarea.lettre { font: 15px/1.65 Georgia, "Iowan Old Style", Cambria, "Times New Roman", serif; padding: 18px 22px; background: var(--papier); }
   .champ { display: block; margin-top: 14px; }
-  .champ > span { display: block; font-size: 12px; font-weight: 600; color: var(--doux); margin-bottom: 5px; }
+  .champ > span { display: block; font-size: 13px; font-weight: 500; color: var(--texte-menu); margin-bottom: 6px; }
   .champ > span .sous { font-weight: 400; }
   kbd { font: 11.5px ui-monospace, monospace; border: 1px solid var(--bord-fort); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; background: var(--surface); }
   summary { cursor: pointer; color: var(--doux); font-weight: 500; list-style: none; display: inline-flex; align-items: center; gap: 8px; }
@@ -179,45 +90,178 @@
   details { font-size: 13.5px; }
   details ul { padding-left: 18px; }
 
+  /* ------------------------------------------------------------ coque : barre latérale + encart */
+  .coque { display: grid; grid-template-columns: 256px minmax(0, 1fr); min-height: 100vh; }
+  .laterale { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 2px; padding: 14px 12px;
+              overflow-y: auto; scrollbar-width: thin; background: var(--fond); }
+  .marque { display: flex; align-items: center; gap: 10px; padding: 4px 8px 14px; }
+  .logo { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; color: #fff;
+          background: linear-gradient(140deg, #194391, #4169e1); box-shadow: 0 2px 8px rgba(25, 67, 145, .35); }
+  .logo svg { width: 18px; height: 18px; }
+  .marque b { display: block; font-size: 14.5px; font-weight: 650; letter-spacing: -.01em; line-height: 1.25; }
+  .marque .sous { display: block; font-size: 12px; line-height: 1.3; }
+  .groupe { padding: 14px 10px 6px; font-size: 12px; font-weight: 500; color: var(--doux); }
+  .menu { display: flex; flex-direction: column; gap: 2px; }
+  .menu button { width: 100%; justify-content: flex-start; gap: 10px; min-height: 36px; padding: 0 10px; border: 0; background: none;
+                 box-shadow: none; color: var(--texte-menu); font-weight: 500; }
+  .menu button svg { width: 17px; height: 17px; color: var(--doux); transition: color .15s; }
+  .menu button:hover:not(:disabled) { background: var(--survol); }
+  .menu button[aria-current=page] { background: var(--secondaire); color: var(--secondaire-texte); font-weight: 600; }
+  .menu button[aria-current=page] svg { color: currentColor; }
+  .compte { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; display: inline-grid; place-items: center;
+            font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--surface); color: var(--doux);
+            border: 1px solid var(--bord); }
+  .menu button[aria-current=page] .compte { background: var(--primaire); border-color: transparent; color: var(--primaire-texte); }
+  .compte.attention { background: color-mix(in srgb, var(--avert) 16%, var(--carte)); border-color: color-mix(in srgb, var(--avert) 35%, var(--carte)); color: var(--avert); }
+  .pied { margin-top: auto; padding-top: 10px; }
+  .liste-verifs { list-style: none; margin: 0; padding: 0 10px; display: grid; gap: 7px; font-size: 13px; }
+  .verif { display: flex; align-items: center; gap: 9px; line-height: 1.3; color: var(--texte-menu); }
+  .verif::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--pale); }
+  .verif.ok::before { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 18%, transparent); }
+  .verif.attention::before { background: var(--avert); box-shadow: 0 0 0 3px color-mix(in srgb, var(--avert) 18%, transparent); }
+  .verif.bloque::before { background: var(--non); box-shadow: 0 0 0 3px color-mix(in srgb, var(--non) 18%, transparent); }
+  .verif.bloque, .verif.attention { cursor: help; }
+  .verifs-boutons { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 10px 0; }
+  .verifs-details { margin: 10px 0 0; padding: 0 10px 0 28px; font-size: 12.5px; color: var(--doux); }
+  .verifs-details li + li { margin-top: 4px; }
+  #mode { margin: 12px 10px 0; padding-top: 12px; border-top: 1px solid var(--bord); font-size: 12px; line-height: 1.45; }
+
+  .encart { min-width: 0; margin: 8px 8px 8px 0; background: var(--encart); border: 1px solid var(--bord); border-radius: 14px;
+            box-shadow: var(--ombre-carte); display: flex; flex-direction: column; }
+  .entete-page { position: sticky; top: 0; z-index: 10; min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 10px 24px;
+                 border-bottom: 1px solid var(--bord); border-radius: 14px 14px 0 0;
+                 background: color-mix(in srgb, var(--encart) 86%, transparent); backdrop-filter: saturate(1.4) blur(12px);
+                 -webkit-backdrop-filter: saturate(1.4) blur(12px); }
+  .titre-page { flex: 1; min-width: 0; }
+  h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -.015em; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .titre-page .sous { margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #ouvrir-menu { display: none; position: relative; }
+  #ouvrir-menu.signal::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%;
+                               background: var(--non); box-shadow: 0 0 0 2px var(--encart); }
+  main { width: 100%; max-width: 1080px; margin: 0 auto; padding: 24px 24px 96px; display: flex; flex-direction: column; gap: 20px; }
+  .voile { position: fixed; inset: 0; z-index: 30; background: rgba(2, 6, 23, .55); }
+
+  /* ------------------------------------------------------------ bouton de cycle (bouton scindé + menu d'options) */
+  .scinde { display: flex; flex: none; }
+  .scinde > button { border-radius: var(--rayon-petit) 0 0 var(--rayon-petit); }
+  .deroulant { position: relative; }
+  .deroulant > summary { border-radius: 0 var(--rayon-petit) var(--rayon-petit) 0; padding: 0 9px; }
+  .scinde .deroulant > summary.principal { border-left-color: color-mix(in srgb, var(--primaire-texte) 25%, transparent); }
+  .deroulant > summary::before { display: none; }
+  .deroulant > summary svg { width: 16px; height: 16px; transition: transform .15s; }
+  .deroulant[open] > summary svg { transform: rotate(180deg); }
+  .menu-flottant { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 300px; padding: 6px; background: var(--carte);
+                   border: 1px solid var(--bord); border-radius: var(--rayon); box-shadow: var(--ombre-haute); animation: surgir .14s ease-out; }
+  .menu-flottant .groupe { padding: 6px 8px 4px; }
+  .menu-flottant label.case { display: flex; padding: 8px; border-radius: 6px; }
+  .menu-flottant label.case:hover { background: var(--survol); }
+  label.case { display: inline-flex; align-items: center; gap: 10px; color: var(--texte); font-size: 14px; cursor: pointer; }
+  label.case input { width: 16px; height: 16px; margin: 0; flex: none; }
+  #lancer:disabled { opacity: 1; background: color-mix(in srgb, var(--primaire) 60%, var(--encart)); cursor: progress; }
+  #lancer:disabled svg { display: none; }
+  #lancer:disabled::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor;
+                             border-right-color: transparent; animation: tourne .8s linear infinite; }
+  @keyframes surgir { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+
+  /* ------------------------------------------------------------ bandeau du cycle */
+  .bandeau-cycle { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 14px 16px; box-shadow: var(--ombre-carte); }
+  .bandeau-cycle.en-cours { border-color: color-mix(in srgb, var(--vif) 45%, var(--bord)); background: color-mix(in srgb, var(--vif) 5%, var(--carte)); }
+  .bandeau-cycle.erreur { border-color: color-mix(in srgb, var(--non) 40%, var(--bord)); background: color-mix(in srgb, var(--non) 4%, var(--carte)); }
+  .cycle-tete { display: flex; align-items: center; gap: 12px; }
+  .cycle-tete > div { flex: 1; min-width: 0; }
+  .cycle-tete b { display: block; font-size: 14px; font-weight: 600; }
+  .cycle-tete .sous { display: block; overflow-wrap: anywhere; }
+  .cycle-icone { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--ok);
+                 background: color-mix(in srgb, var(--ok) 14%, var(--carte)); }
+  .cycle-icone svg { width: 16px; height: 16px; }
+  .en-cours .cycle-icone { color: var(--vif); background: color-mix(in srgb, var(--vif) 14%, var(--carte)); }
+  .en-cours .cycle-icone::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+                                   animation: tourne .8s linear infinite; }
+  .en-cours .cycle-icone svg { display: none; }
+  .erreur .cycle-icone { color: var(--non); background: color-mix(in srgb, var(--non) 14%, var(--carte)); }
+  .etapes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+  .etape { display: grid; gap: 6px; font-size: 12.5px; color: var(--doux); }
+  .etape .barre { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--texte) 8%, transparent); overflow: hidden; }
+  .etape .barre i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--vif); transition: width .3s; }
+  .etape.fait { color: var(--ok); }
+  .etape.fait .barre i { width: 100%; background: var(--ok); }
+  .etape.encours { color: var(--texte); font-weight: 600; }
+  #details-journal { margin-top: 12px; }
+  pre.journal { margin: 8px 0 0; max-height: 240px; overflow: auto; background: var(--surface); border: 1px solid var(--bord);
+                border-radius: var(--rayon-petit); padding: 10px 12px; font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; }
+
+  /* ------------------------------------------------------------ chiffres (cartes de statistiques) */
+  .chiffres { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; }
+  .chiffre { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 14px 16px; box-shadow: var(--ombre-carte);
+             display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .chiffre-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; color: var(--texte-menu); }
+  .chiffre-tete svg { width: 17px; height: 17px; color: var(--pale); }
+  .chiffre b { display: block; margin-top: 6px; font-size: 24px; font-weight: 650; letter-spacing: -.02em; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .chiffre .sous { font-size: 12px; line-height: 1.4; }
+  .chiffre.fort { border-color: color-mix(in srgb, var(--vif) 40%, var(--bord)); background: linear-gradient(180deg, color-mix(in srgb, var(--vif) 7%, var(--carte)), var(--carte)); }
+  .chiffre.fort b, .chiffre.fort .chiffre-tete svg { color: var(--vif); }
+  .jauge { height: 6px; margin: 8px 0 2px; border-radius: 3px; background: var(--secondaire); overflow: hidden; }
+  .jauge i { display: block; height: 100%; border-radius: 3px; background: var(--primaire); transform-origin: left; animation: remplir .6s ease-out both; }
+  .jauge.pleine i { background: var(--avert); }
+  @keyframes remplir { from { transform: scaleX(0); } }
+
+  /* ------------------------------------------------------------ panneaux */
+  .panneau { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 18px 20px; box-shadow: var(--ombre-carte); }
+  .panneau-tete { margin-bottom: 14px; }
+  .panneau-tete .sous { margin: 4px 0 0; }
+  .vue { display: flex; flex-direction: column; gap: 14px; }
+  .vue > h2 { margin-top: 18px; }
+  .grille-reglages { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 20px; }
+  .grille-reglages .champ:first-child, .grille-reglages .champ:nth-child(2) { margin-top: 0; }
+
   /* ------------------------------------------------------------ cartes de la file */
-  .outils { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .outils { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .outils input { flex: 1 1 220px; min-height: 36px; }
   .raccourcis { margin-left: auto; }
-  .carte { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 18px 20px; margin-bottom: 14px;
-           box-shadow: var(--ombre); transition: border-color .2s, box-shadow .2s; }
-  .carte.active { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent), var(--ombre); }
+  #file { display: flex; flex-direction: column; gap: 14px; }
+  .carte { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 18px 20px; box-shadow: var(--ombre-carte);
+           transition: border-color .2s, box-shadow .2s; }
+  .carte.active { border-color: var(--vif); box-shadow: 0 0 0 3px color-mix(in srgb, var(--vif) 22%, transparent), var(--ombre-carte); }
   .entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
   .entete > div:first-child { flex: 1; min-width: 0; }
-  .entete h3 { margin: 0; font-size: 18px; font-weight: 680; letter-spacing: -.01em; line-height: 1.3; overflow-wrap: anywhere; }
-  .entete .sous { margin-top: 2px; }
-  .surtitre { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; font-size: 11.5px; font-weight: 650; letter-spacing: .06em;
+  .entete h3 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.01em; line-height: 1.3; overflow-wrap: anywhere; }
+  .entete-dossier { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 14px; }
+  .entete-dossier h3 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -.015em; line-height: 1.3; overflow-wrap: anywhere; }
+  .entete-dossier .sous { margin-top: 1px; }
+  .avatar { --teinte: 220; width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; font-size: 14.5px; font-weight: 650;
+            letter-spacing: .02em; color: hsl(var(--teinte) 45% 30%); background: hsl(var(--teinte) 70% 93%);
+            border: 1px solid hsl(var(--teinte) 50% 86%); }
+  @media (prefers-color-scheme: dark) {
+    .avatar { color: hsl(var(--teinte) 70% 82%); background: hsl(var(--teinte) 35% 20%); border-color: hsl(var(--teinte) 30% 28%); }
+  }
+  .surtitre { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: 11.5px; font-weight: 600; letter-spacing: .05em;
               text-transform: uppercase; color: var(--doux); }
-  .surtitre::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .carte[data-genre=valider] .surtitre { color: var(--accent); }
+  .surtitre::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .carte[data-genre=valider] .surtitre { color: var(--vif); }
   .carte[data-genre=depot] .surtitre { color: var(--violet); }
   .carte[data-genre=alerte] .surtitre { color: var(--avert); }
-  .badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; margin-top: 10px; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; margin-top: 9px; }
   .badges:empty { display: none; }
-  .entete .badges + .badges { margin-top: 0; }
   .badge, .pastille { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
                       font-size: 12px; font-weight: 550; line-height: 1.5; border-radius: 99px; padding: 1px 9px;
-                      color: var(--doux); background: var(--surface); border: 1px solid var(--bord); }
-  .badge.ok, .pastille.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--carte)); border-color: color-mix(in srgb, var(--ok) 28%, var(--carte)); }
-  .badge.avert, .pastille.avert { color: var(--avert); background: color-mix(in srgb, var(--avert) 10%, var(--carte)); border-color: color-mix(in srgb, var(--avert) 30%, var(--carte)); }
-  .badge.violet { color: var(--violet); background: color-mix(in srgb, var(--violet) 9%, var(--carte)); border-color: color-mix(in srgb, var(--violet) 28%, var(--carte)); }
-  .pastille.non { color: var(--non); background: color-mix(in srgb, var(--non) 9%, var(--carte)); border-color: color-mix(in srgb, var(--non) 28%, var(--carte)); }
-  .pastille.info { color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--carte)); border-color: color-mix(in srgb, var(--accent) 28%, var(--carte)); }
+                      color: var(--texte-menu); background: var(--surface); border: 1px solid var(--bord); }
+  .badge.ok, .pastille.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--carte)); border-color: color-mix(in srgb, var(--ok) 26%, var(--carte)); }
+  .badge.avert, .pastille.avert { color: var(--avert); background: color-mix(in srgb, var(--avert) 10%, var(--carte)); border-color: color-mix(in srgb, var(--avert) 28%, var(--carte)); }
+  .badge.violet { color: var(--violet); background: color-mix(in srgb, var(--violet) 9%, var(--carte)); border-color: color-mix(in srgb, var(--violet) 26%, var(--carte)); }
+  .badge.info, .pastille.info { color: var(--secondaire-texte); background: var(--secondaire); border-color: transparent; }
+  .pastille.non { color: var(--non); background: color-mix(in srgb, var(--non) 9%, var(--carte)); border-color: color-mix(in srgb, var(--non) 26%, var(--carte)); }
   .pastille.doux { color: var(--doux); }
-  .score { --c: var(--pale); flex: none; position: relative; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center;
+  .score { --c: var(--pale); flex: none; position: relative; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center;
            background: conic-gradient(var(--c) calc(var(--v) * 1%), color-mix(in srgb, var(--texte) 9%, transparent) 0); }
   .score::before { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--carte); }
   .score > span { position: relative; text-align: center; line-height: 1; }
   .score b { display: block; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .score small { display: block; margin-top: 2px; font-size: 8.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--doux); }
-  .score.haut { --c: var(--ok); } .score.moyen { --c: var(--accent); }
-  .question { color: var(--doux); font-size: 14px; margin: 12px 0 0; white-space: pre-wrap; }
-  .pourquoi { margin: 12px 0 0; padding: 10px 14px; font-size: 14px; background: var(--surface); border: 1px solid var(--bord); border-radius: 10px; }
-  .pourquoi b { display: block; margin-bottom: 2px; font-size: 11.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--doux); }
+  .score.haut { --c: var(--ok); } .score.moyen { --c: var(--vif); }
+  .question { color: var(--doux); font-size: 14px; margin: 14px 0 0; white-space: pre-wrap; }
+  .pourquoi { margin: 12px 0 0; padding: 10px 14px; font-size: 14px; background: var(--surface); border-radius: var(--rayon-petit);
+              border-left: 3px solid color-mix(in srgb, var(--vif) 55%, var(--bord)); }
+  .pourquoi b { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 600; color: var(--texte-menu); }
   .remarques { margin: 12px 0 0; padding: 0; list-style: none; font-size: 13.5px; display: grid; gap: 4px; }
   .remarques li { position: relative; padding-left: 16px; }
   .remarques li::before { content: ""; position: absolute; left: 3px; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: var(--pale); }
@@ -225,77 +269,100 @@
   .remarques li.bloquant::before { background: var(--non); }
   .carte details { margin-top: 12px; }
   .carte > p.sous { margin: 10px 0 0; }
+
+  /* Brouillon (d'après « Message Draft » de 21st.dev) : en-têtes du mail, séparateur, corps repliable. */
+  .brouillon { --fond-zone: var(--carte); margin-top: 14px; padding: 10px 18px 12px; border: 1px solid var(--bord); border-radius: 14px;
+               background: var(--fond-zone); transition: border-color .15s, box-shadow .15s; }
+  .brouillon:focus-within { border-color: var(--vif); box-shadow: 0 0 0 3px color-mix(in srgb, var(--vif) 18%, transparent); }
+  .brouillon-titre { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; font-size: 12px; font-weight: 600; color: var(--doux); }
+  .brouillon-titre svg { width: 15px; height: 15px; }
+  .brouillon-titre a { margin-left: auto; font-weight: 500; }
+  table.entetes-mail { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .entetes-mail th { width: 0; padding: 4px 14px 4px 0; text-align: right; vertical-align: middle; font-weight: 500; color: var(--doux); white-space: nowrap; }
+  .entetes-mail td { padding: 2px 0; overflow-wrap: anywhere; }
+  .separateur { height: 1px; margin: 8px -18px 4px; background: var(--bord); }
+  input.nu, textarea.nu { border: 1px solid transparent; background: transparent; box-shadow: none; border-radius: 6px; }
+  input.nu { padding: 4px 8px; margin-left: -8px; width: calc(100% + 8px); font-weight: 600; }
+  input.nu:hover:not([readonly]) { background: var(--survol); }
+  input.nu:focus { border-color: transparent; box-shadow: none; background: var(--survol); }
+  textarea.nu { padding: 6px 0; resize: none; field-sizing: content; min-height: 4lh; }
+  textarea.nu:hover, textarea.nu:focus { border-color: transparent; box-shadow: none; }
+  input.nu[readonly], textarea.nu[readonly] { background: transparent; }
+  .brouillon.papier { --fond-zone: var(--papier); }
+  textarea.lettre { font: 15px/1.7 Georgia, "Iowan Old Style", Cambria, "Times New Roman", serif; }
+  .depliable { position: relative; }
+  .depliable.long:not(.ouvert) { max-height: 420px; overflow: hidden; }
+  .depliable.long:not(.ouvert)::after { content: ""; position: absolute; inset: auto 0 0; height: 64px; pointer-events: none;
+                                        background: linear-gradient(to top, var(--fond-zone), transparent); }
+  button.lire-suite { margin: 6px 0 0 -10px; min-height: 28px; padding: 2px 10px; font-size: 13px; color: var(--doux); }
+  button.lire-suite svg { width: 14px; height: 14px; transition: transform .15s; }
+  button.lire-suite[aria-expanded=true] svg { transform: rotate(180deg); }
+
+  /* Pied de carte : actions alignées à droite, l'action principale en dernier. */
   .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
-  .carte > .actions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--bord); }
-  .carte > .actions > button.danger:last-child { margin-left: auto; }
-  .actions .modifie { font-size: 12.5px; color: var(--avert); display: none; }
-  .depot { margin-top: 12px; padding: 12px 14px; border-radius: 10px; font-size: 14px; background: var(--surface); border: 1px solid var(--bord); }
-  .depot.formulaire { background: color-mix(in srgb, var(--violet) 6%, var(--carte)); border-color: color-mix(in srgb, var(--violet) 24%, var(--carte)); }
-  .depot.contact { background: color-mix(in srgb, var(--accent) 6%, var(--carte)); border-color: color-mix(in srgb, var(--accent) 24%, var(--carte)); }
-  .depot.place { background: color-mix(in srgb, var(--ok) 6%, var(--carte)); border-color: color-mix(in srgb, var(--ok) 24%, var(--carte)); }
+  .actions.fin { justify-content: flex-end; }
+  .carte > .actions, .carte > .differe { margin: 18px -20px -18px; padding: 12px 20px; justify-content: flex-end; border-top: 1px solid var(--bord);
+                                          background: color-mix(in srgb, var(--surface) 55%, var(--carte)); border-radius: 0 0 var(--rayon) var(--rayon); }
+  .actions .modifie { margin-right: auto; font-size: 12.5px; color: var(--avert); display: none; }
+  .differe { display: flex; align-items: center; gap: 12px; }
+  .differe .sous { font-variant-numeric: tabular-nums; }
+  .depot { margin-top: 14px; padding: 12px 14px; border-radius: var(--rayon-petit); font-size: 14px; background: var(--surface); border: 1px solid var(--bord); }
+  .depot.formulaire { background: color-mix(in srgb, var(--violet) 6%, var(--carte)); border-color: color-mix(in srgb, var(--violet) 22%, var(--carte)); }
+  .depot.contact { background: color-mix(in srgb, var(--vif) 6%, var(--carte)); border-color: color-mix(in srgb, var(--vif) 22%, var(--carte)); }
+  .depot.place { background: color-mix(in srgb, var(--ok) 6%, var(--carte)); border-color: color-mix(in srgb, var(--ok) 22%, var(--carte)); }
   .etat-depot { margin: 8px 0 0; font-weight: 600; white-space: pre-line; overflow-wrap: anywhere; }
   .etat-depot.ok { color: var(--ok); }
   .etat-depot.avert { color: var(--avert); }
   .ligne-adresse { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .ligne-adresse input { flex: 1 1 240px; min-width: 0; width: auto; }
   .carte.alerte { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 16px;
-                  background: color-mix(in srgb, var(--avert) 4%, var(--carte)); border-color: color-mix(in srgb, var(--avert) 28%, var(--bord)); }
+                  background: color-mix(in srgb, var(--avert) 4%, var(--carte)); border-color: color-mix(in srgb, var(--avert) 26%, var(--bord)); }
   .carte.alerte .surtitre { margin-bottom: 2px; }
   .carte.alerte .surtitre::before { display: none; }
   .carte.alerte .question { margin: 0; color: var(--texte); overflow-wrap: anywhere; }
-  .carte.alerte > .actions { margin: 0; padding: 0; border: 0; }
-  .alerte-icone { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: var(--avert);
+  .carte.alerte > .actions { margin: 0; padding: 0; border: 0; background: none; }
+  .alerte-icone { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: var(--avert);
                   background: color-mix(in srgb, var(--avert) 14%, var(--carte)); }
   .alerte-icone svg { width: 18px; height: 18px; }
-  .tiroir { margin-top: 14px; padding: 14px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 4%, var(--carte));
-            border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--bord)); }
-  .tiroir .actions { margin-top: 10px; }
+  .tiroir { margin-top: 14px; padding: 14px; border-radius: var(--rayon); background: color-mix(in srgb, var(--vif) 5%, var(--carte));
+            border: 1px solid color-mix(in srgb, var(--vif) 26%, var(--bord)); }
+  .tiroir .actions { margin-top: 10px; justify-content: flex-end; }
   .puces { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
   button.puce { min-height: 28px; padding: 3px 11px; font-size: 13px; border-radius: 99px; background: var(--carte); }
-  button.puce:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--carte)); }
+  button.puce:hover:not(:disabled) { color: var(--accent); border-color: var(--vif); background: color-mix(in srgb, var(--vif) 7%, var(--carte)); }
   .comparaison h4 { font-size: 12px; color: var(--doux); font-weight: 600; margin: 12px 0 4px; }
-  .diff { white-space: pre-wrap; background: var(--surface); border: 1px solid var(--bord); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; line-height: 1.6; }
+  .diff { white-space: pre-wrap; background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon-petit); padding: 10px 12px; font-size: 13.5px; line-height: 1.6; }
   .diff ins { background: color-mix(in srgb, var(--ok) 22%, transparent); text-decoration: none; border-radius: 3px; }
   .diff del { background: color-mix(in srgb, var(--non) 16%, transparent); color: var(--doux); border-radius: 3px; }
-  .vide { color: var(--doux); text-align: center; padding: 40px 20px; font-size: 14px; border: 1.5px dashed var(--bord-fort); border-radius: var(--rayon); }
-  .vide::before { content: ""; display: block; width: 30px; height: 30px; margin: 0 auto 10px; background: var(--pale);
-                  -webkit-mask: var(--icone-vide) center / contain no-repeat; mask: var(--icone-vide) center / contain no-repeat; }
-  :root { --icone-vide: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/%3E%3C/svg%3E"); }
-  .grille-reglages { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
-  @media (max-width: 1080px) { .grille-reglages { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 18px; } }
+  .vide { color: var(--doux); text-align: center; padding: 44px 20px; font-size: 14px; border: 1.5px dashed var(--bord-fort); border-radius: var(--rayon); }
+  .vide::before { content: ""; display: block; width: 44px; height: 44px; margin: 0 auto 12px; border-radius: 12px;
+                  background: var(--surface) var(--icone-vide) center / 22px no-repeat; box-shadow: inset 0 0 0 1px var(--bord); }
+  :root { --icone-vide: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-6l-2 3h-4l-2-3H2'/%3E%3Cpath d='M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'/%3E%3C/svg%3E"); }
 
-  /* ------------------------------------------------------------ tableaux */
+  /* ------------------------------------------------------------ tableaux (dans un cadre de carte) */
   table.liste { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--carte); border: 1px solid var(--bord);
-                border-radius: var(--rayon); overflow: hidden; font-size: 14px; box-shadow: var(--ombre); }
-  .liste th { text-align: left; font-size: 11.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--doux);
-              padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--bord); }
+                border-radius: var(--rayon); overflow: hidden; font-size: 14px; box-shadow: var(--ombre-carte); }
+  .liste th { text-align: left; font-size: 12.5px; font-weight: 500; color: var(--doux); padding: 10px 14px;
+              background: color-mix(in srgb, var(--surface) 60%, var(--carte)); border-bottom: 1px solid var(--bord); }
   .liste td { padding: 12px 14px; border-bottom: 1px solid var(--bord); vertical-align: top; }
   .liste tbody tr:last-child td { border-bottom: 0; }
   .liste tbody tr { transition: background .15s; }
-  .liste tbody tr:hover { background: color-mix(in srgb, var(--surface) 75%, transparent); }
+  .liste tbody tr:hover { background: color-mix(in srgb, var(--surface) 50%, transparent); }
   .liste td a { font-weight: 600; }
   .liste td.date { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .liste .du { color: var(--avert); font-weight: 600; }
   .liste button { min-height: 30px; padding: 3px 10px; font-size: 13px; white-space: nowrap; }
   .liste td .pastille + .sous { display: block; margin-top: 3px; }
-  @media (max-width: 680px) {
-    .liste thead { display: none; }
-    .liste tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--bord); }
-    .liste tbody tr:last-child { border-bottom: 0; }
-    .liste td { display: block; border: 0; padding: 3px 14px; }
-    .liste td[data-titre]:empty { display: none; }
-    .liste td[data-titre]::before { content: attr(data-titre) " : "; color: var(--doux); font-size: 12.5px; }
-  }
 
   /* ------------------------------------------------------------ tournée */
-  ol.arrets { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: arret; }
+  ol.arrets { list-style: none; padding: 0; margin: 0; counter-reset: arret; display: grid; gap: 14px; }
   ol.arrets > li { counter-increment: arret; position: relative; padding-left: 48px; }
   ol.arrets > li::before { content: counter(arret); position: absolute; z-index: 1; left: 4px; top: 18px; width: 30px; height: 30px; border-radius: 50%;
-                           background: var(--accent); color: var(--accent-texte); font-size: 13px; font-weight: 700; text-align: center; line-height: 30px;
-                           box-shadow: 0 0 0 4px var(--fond); }
+                           background: var(--primaire); color: var(--primaire-texte); font-size: 13px; font-weight: 700; text-align: center; line-height: 30px;
+                           box-shadow: 0 0 0 4px var(--encart); }
   ol.arrets > li:not(:last-child)::after { content: ""; position: absolute; left: 18px; top: 48px; bottom: -14px; width: 2px; background: var(--bord-fort); }
-  .aide { position: fixed; right: 16px; bottom: 70px; z-index: 15; width: 330px; max-width: calc(100% - 32px); background: var(--carte);
-          border: 1px solid var(--bord); border-radius: var(--rayon); padding: 16px 18px; box-shadow: var(--ombre-haute); font-size: 14px; }
+  .aide { position: fixed; right: 20px; bottom: 84px; z-index: 25; width: 330px; max-width: calc(100% - 32px); background: var(--carte);
+          border: 1px solid var(--bord); border-radius: var(--rayon); padding: 16px 18px; box-shadow: var(--ombre-haute); font-size: 14px; animation: surgir .14s ease-out; }
   .aide h3 { margin: 0 0 10px; font-size: 15px; }
   .aide dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; }
   .aide dd { margin: 0; color: var(--doux); }
@@ -309,7 +376,7 @@
   .noeud .rond { position: relative; z-index: 1; width: 44px; height: 44px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center;
                  background: var(--carte); border: 2px solid var(--bord-fort); color: var(--doux); font-weight: 700; font-size: 15px;
                  transition: background .3s, border-color .3s, color .3s, transform .2s; }
-  .noeud:hover .rond { transform: translateY(-2px); border-color: var(--accent); color: var(--accent); }
+  .noeud:hover .rond { transform: translateY(-2px); border-color: var(--vif); color: var(--vif); }
   .noeud .rond svg { width: 20px; height: 20px; }
   .noeud .nom { display: block; margin-top: 7px; font-size: 12px; letter-spacing: -.01em; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .noeud .info { display: block; font-size: 11.5px; color: var(--doux); min-height: 2.6em; overflow: hidden; text-overflow: ellipsis; }
@@ -317,22 +384,22 @@
   .noeud.fait .rond { border-color: var(--ok); color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, var(--carte)); }
   .noeud.fait + .noeud::before { background: var(--ok); }
   .noeud.erreur .rond { border-color: var(--non); color: var(--non); background: color-mix(in srgb, var(--non) 8%, var(--carte)); }
-  .noeud.actif .rond { background: var(--accent); border-color: var(--accent); color: var(--accent-texte); animation: pouls 1.4s ease-out infinite; }
+  .noeud.actif .rond { background: var(--primaire); border-color: var(--primaire); color: var(--primaire-texte); animation: pouls 1.4s ease-out infinite; }
   .noeud.actif .rond::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px solid transparent;
-                              border-top-color: var(--accent); border-right-color: var(--accent); animation: tourne 1s linear infinite; }
+                              border-top-color: var(--vif); border-right-color: var(--vif); animation: tourne 1s linear infinite; }
   .noeud.actif .info { color: var(--texte); }
-  .noeud.actif:not(:first-child)::before { background: repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 12px);
+  .noeud.actif:not(:first-child)::before { background: repeating-linear-gradient(90deg, var(--vif) 0 6px, transparent 6px 12px);
                                            background-size: 24px 2px; animation: flux .7s linear infinite; }
   .noeud.actif:not(:first-child)::after { content: ""; position: absolute; z-index: 2; top: 17px; width: 10px; height: 10px; margin-left: -5px;
-                                          border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: voyage 1.3s ease-in-out infinite; }
+                                          border-radius: 50%; background: var(--vif); box-shadow: 0 0 8px var(--vif); animation: voyage 1.3s ease-in-out infinite; }
   .noeud.repos .rond { border-style: dashed; }
-  .noeud:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .noeud:focus-visible { outline: 2px solid var(--vif); outline-offset: 2px; border-radius: 8px; }
   .retour { position: relative; margin: 2px 5.6% 0 16.7%; height: 18px; border: 2px dashed var(--bord-fort); border-top: 0; border-radius: 0 0 14px 14px; }
   .retour span { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); background: var(--carte); padding: 0 8px;
                  font-size: 11.5px; color: var(--doux); white-space: nowrap; }
-  .retour.actif { border-color: var(--accent); animation: clignote 1.2s ease-in-out infinite; }
+  .retour.actif { border-color: var(--vif); animation: clignote 1.2s ease-in-out infinite; }
   .legende-pipeline { margin: 20px 0 0; font-size: 13px; }
-  @keyframes pouls { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+  @keyframes pouls { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--vif) 50%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
   @keyframes tourne { to { transform: rotate(360deg); } }
   @keyframes flux { to { background-position: 24px 0; } }
   @keyframes voyage { 0% { left: -50%; opacity: 0; } 15%, 85% { opacity: 1; } 100% { left: 50%; opacity: 0; } }
@@ -347,18 +414,19 @@
     .noeud .nom { margin: 0; }
     .noeud .info { min-height: 0; }
     .noeud + .noeud::before { top: auto; bottom: calc(100% - 4px); right: auto; left: 21px; width: 2px; height: 14px; }
-    .noeud.actif:not(:first-child)::before { background: repeating-linear-gradient(180deg, var(--accent) 0 4px, transparent 4px 8px); background-size: 2px 16px; animation: flux-v .7s linear infinite; }
+    .noeud.actif:not(:first-child)::before { background: repeating-linear-gradient(180deg, var(--vif) 0 4px, transparent 4px 8px); background-size: 2px 16px; animation: flux-v .7s linear infinite; }
     .noeud.actif:not(:first-child)::after { left: 17px; margin-left: 0; animation-name: voyage-v; }
     .retour { margin: 8px 0 0; height: auto; border: 0; }
     .retour span { position: static; transform: none; padding: 0; white-space: normal; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .noeud, .noeud.actif .rond, .noeud.actif .rond::after, .noeud.actif::before, .noeud.actif::after, .retour.actif, #lancer:disabled::before { animation: none !important; }
+    .noeud, .noeud.actif .rond, .noeud.actif .rond::after, .noeud.actif::before, .noeud.actif::after, .retour.actif,
+    #lancer:disabled::before, .en-cours .cycle-icone::before, .jauge i, .menu-flottant, .aide { animation: none !important; }
     * { transition: none !important; }
   }
   .grille-agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
   .grille-agents .carte { margin: 0; }
-  .grille-agents .carte.encours { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .grille-agents .carte.encours { border-color: var(--vif); box-shadow: 0 0 0 3px color-mix(in srgb, var(--vif) 22%, transparent); }
   .grille-agents .entete { align-items: center; }
   .grille-agents h3 { margin: 0; font-size: 15px; }
   .grille-agents .carte > .sous { margin-top: 4px; }
@@ -367,107 +435,140 @@
   .grille-agents dd { margin: 0; font-variant-numeric: tabular-nums; }
   .erreur-agent { margin: 8px 0 0; font-size: 12.5px; color: var(--non); overflow-wrap: anywhere; }
   .barres { display: grid; grid-template-columns: minmax(0, max-content) 1fr auto; gap: 8px 10px; align-items: center; font-size: 13.5px; margin: 8px 0 0; }
-  .barres .jauge { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--texte) 8%, transparent); overflow: hidden; min-width: 60px; }
-  .barres .jauge i { display: block; height: 100%; background: var(--accent); border-radius: 4px; transform-origin: left; animation: remplir .6s ease-out both; }
+  .barres .jauge { margin: 0; height: 8px; min-width: 60px; }
   .barres .n { color: var(--doux); font-variant-numeric: tabular-nums; }
-  @keyframes remplir { from { transform: scaleX(0); } }
-  #bilan .chiffres { margin-bottom: 12px; }
+  #propositions, #bilan { display: flex; flex-direction: column; gap: 12px; }
   .deux-colonnes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
   .deux-colonnes .panneau h3 { margin: 0 0 6px; font-size: 14px; }
   .deux-colonnes ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; }
-  #bilan > .actions { margin-top: 14px; }
+  #bilan > .actions { margin-top: 2px; }
 
-  /* ------------------------------------------------------------ petit écran */
+  /* ------------------------------------------------------------ écran moyen et petit */
+  @media (max-width: 900px) {
+    .coque { grid-template-columns: minmax(0, 1fr); }
+    .laterale { position: fixed; inset: 0 auto 0 0; z-index: 40; width: min(300px, 86vw); height: auto; padding-top: 16px;
+                border-right: 1px solid var(--bord); box-shadow: var(--ombre-haute); transform: translateX(-102%); transition: transform .22s ease-out; }
+    .coque.menu-ouvert .laterale { transform: none; }
+    .encart { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+    .entete-page { border-radius: 0; padding: 10px 16px; }
+    #ouvrir-menu { display: inline-flex; }
+  }
   @media (max-width: 680px) {
-    .barre-int { padding: 8px 12px; flex-wrap: nowrap; gap: 8px; }
-    .marque h1 { display: none; }
-    .onglets { flex: 1; min-width: 0; -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); }
+    h1 { font-size: 16.5px; }
+    .titre-page .sous, .scinde .long { display: none; }
+    main { padding: 16px 16px 80px; gap: 16px; }
+    /* les chiffres défilent sur une ligne : la file reste en haut de l'écran */
+    main > .chiffres { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+                       margin: 0 -16px; padding: 0 16px 2px; scroll-padding: 0 16px; }
+    main > .chiffres::-webkit-scrollbar { display: none; }
+    main > .chiffres .chiffre { flex: 0 0 40%; scroll-snap-align: start; }
+    .chiffre { padding: 10px 12px; }
+    .chiffre b { font-size: 19px; margin-top: 2px; }
+    .chiffre-tete { font-size: 12.5px; }
+    .chiffre-tete svg { width: 15px; height: 15px; }
+    main > .chiffres .chiffre > .sous { display: none; }
+    #bilan .chiffres { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .etapes { gap: 6px; }
+    .etape { font-size: 11px; }
     .outils select { flex: 1 1 140px; min-width: 0; }
-    .onglets button { padding: 4px 9px; font-size: 13.5px; gap: 5px; }
-    .page { padding: 14px 16px 80px; }
     .carte { padding: 16px; }
-    .entete h3 { font-size: 17px; }
+    .carte > .actions, .carte > .differe { margin: 16px -16px -16px; padding: 12px 16px; }
+    .entete-dossier { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+    .avatar { display: none; }
+    .entete-dossier h3 { font-size: 16.5px; }
     .score { width: 48px; height: 48px; }
     .score b { font-size: 14px; }
+    .brouillon { padding: 8px 14px 10px; }
+    .separateur { margin: 8px -14px 4px; }
     .raccourcis { display: none; }
-    textarea.lettre { padding: 14px 16px; }
     .carte.alerte { grid-template-columns: auto minmax(0, 1fr); }
     .carte.alerte > .actions { grid-column: 2; }
+    .liste thead { display: none; }
+    .liste tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--bord); }
+    .liste tbody tr:last-child { border-bottom: 0; }
+    .liste td { display: block; border: 0; padding: 3px 14px; }
+    .liste td[data-titre]:empty { display: none; }
+    .liste td[data-titre]::before { content: attr(data-titre) " : "; color: var(--doux); font-size: 12.5px; }
+    .menu-flottant { width: min(300px, calc(100vw - 32px)); }
   }
 
   #impression { display: none; }
   @media print {
     body { background: #fff; color: #000; }
-    .barre, .page, #toast, .aide { display: none !important; }
+    .coque, #toast, .aide { display: none !important; }
     #impression { display: block; font: 11pt/1.5 Georgia, "Times New Roman", serif; }
-    #impression h1 { font: 600 16pt system-ui, sans-serif; white-space: normal; }
+    #impression h1 { font: 600 16pt system-ui, sans-serif; white-space: normal; overflow: visible; }
     #impression .feuille + .feuille { break-before: page; }
     #impression .lettre { white-space: pre-wrap; }
     #impression li { margin-bottom: 8px; }
   }
-  #toast { position: fixed; left: 50%; bottom: 24px; z-index: 20; transform: translate(-50%, 8px); max-width: min(560px, calc(100% - 32px));
-           background: var(--texte); color: var(--fond); padding: 11px 18px; border-radius: 12px; font-size: 14px; box-shadow: var(--ombre-haute);
-           opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
-  #toast.visible { opacity: 1; transform: translate(-50%, 0); }
-  #toast.erreur { background: var(--non); color: #fff; }
+  #toast { position: fixed; right: 20px; bottom: 20px; z-index: 50; transform: translateY(8px); max-width: min(440px, calc(100% - 32px));
+           background: var(--carte); color: var(--texte); border: 1px solid var(--bord); padding: 12px 16px 12px 14px; border-radius: var(--rayon);
+           font-size: 14px; box-shadow: var(--ombre-haute); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none;
+           display: flex; gap: 10px; align-items: flex-start; }
+  #toast::before { content: ""; flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--ok); }
+  #toast.visible { opacity: 1; transform: none; }
+  #toast.erreur { border-color: color-mix(in srgb, var(--non) 40%, var(--bord)); }
+  #toast.erreur::before { background: var(--non); }
+  @media (max-width: 680px) { #toast { left: 16px; right: 16px; bottom: 16px; max-width: none; } }
 </style>
 </head>
 <body>
-<header class="barre">
-  <div class="barre-int">
-    <div class="marque">
-      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg></span>
-      <h1>Recherche de stage</h1>
-    </div>
-    <nav class="onglets" role="tablist" aria-label="Vues">
-      <button role="tab" id="onglet-file" data-vue="file">À traiter</button>
-      <button role="tab" id="onglet-candidatures" data-vue="candidatures">Mes candidatures</button>
-      <button role="tab" id="onglet-tournee" data-vue="tournee">Sur place</button>
-      <button role="tab" id="onglet-agents" data-vue="agents">Agents</button>
-    </nav>
+<div class="coque" id="coque">
+<aside class="laterale" id="laterale" aria-label="Navigation">
+  <div class="marque">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg></span>
+    <div><b>Recherche de stage</b><span class="sous">Agents de candidature</span></div>
+  </div>
+  <nav class="menu" aria-label="Vues">
+    <div class="groupe">Candidatures</div>
+    <button id="onglet-file" data-vue="file" data-icone="boite"><span>À traiter</span><span class="compte" hidden></span></button>
+    <button id="onglet-candidatures" data-vue="candidatures" data-icone="liste"><span>Mes candidatures</span><span class="compte" hidden></span></button>
+    <button id="onglet-tournee" data-vue="tournee" data-icone="lieu"><span>Sur place</span><span class="compte" hidden></span></button>
+    <div class="groupe">Pilotage</div>
+    <button id="onglet-agents" data-vue="agents" data-icone="agents"><span>Agents</span><span class="compte" hidden></span></button>
+    <button id="onglet-reglages" data-vue="reglages" data-icone="reglages"><span>Réglages</span><span class="compte" hidden></span></button>
+  </nav>
+  <div class="pied">
+    <div class="groupe">État</div>
+    <div id="verifs" aria-live="polite"></div>
+    <div class="sous" id="mode"></div>
+  </div>
+</aside>
+<div class="voile" id="voile" hidden></div>
+
+<div class="encart">
+<header class="entete-page">
+  <button class="fantome icone-seule" id="ouvrir-menu" aria-label="Menu" aria-controls="laterale" aria-expanded="false" data-icone="menu"></button>
+  <div class="titre-page"><h1 id="titre-vue">À traiter</h1><p class="sous" id="desc-vue"></p></div>
+  <div class="scinde">
+    <button class="principal" id="lancer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.8v14.4a.8.8 0 0 0 1.2.7l11.3-7.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z" fill="currentColor"/></svg><span id="lancer-texte">Lancer<span class="long"> un cycle</span></span></button>
+    <details class="deroulant" id="options-cycle">
+      <summary class="principal" aria-label="Options du cycle" title="Options du cycle : boîte mail, envoi" data-icone="chevron"></summary>
+      <div class="menu-flottant">
+        <div class="groupe">Pendant le cycle</div>
+        <label class="case"><input type="checkbox" id="suivi"> Lire la boîte mail (réponses, relances)</label>
+        <label class="case"><input type="checkbox" id="envoi" checked> Envoyer les mails validés</label>
+      </div>
+    </details>
   </div>
 </header>
 
-<div class="page">
-<aside class="cote">
-  <section class="panneau cycle" aria-label="Cycle">
-    <button class="principal grand" id="lancer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.8v14.4a.8.8 0 0 0 1.2.7l11.3-7.2a.8.8 0 0 0 0-1.4L8.2 4.1A.8.8 0 0 0 7 4.8z" fill="currentColor"/></svg><span id="lancer-texte">Lancer un cycle</span></button>
-    <div class="options">
-      <label class="case"><input type="checkbox" id="suivi"> Lire la boîte mail (réponses, relances)</label>
-      <label class="case"><input type="checkbox" id="envoi" checked> Envoyer les mails validés</label>
+<main>
+  <section class="bandeau-cycle" id="bandeau-cycle" aria-label="Cycle" hidden>
+    <div class="cycle-tete">
+      <span class="cycle-icone" id="cycle-icone" data-icone="ok"></span>
+      <div><b id="cycle-titre"></b><span class="sous" id="cycle-etat"></span></div>
+      <button class="fantome icone-seule petit" id="fermer-bandeau" aria-label="Masquer" title="Masquer jusqu'au prochain cycle" data-icone="croix"></button>
     </div>
-    <span class="sous" id="cycle-etat"></span>
-    <div class="verifs" id="verifs" aria-live="polite"></div>
     <div class="etapes" id="etapes" hidden></div>
     <details id="details-journal" hidden><summary>Journal détaillé</summary><pre class="journal" id="journal"></pre></details>
-    <div class="sous" id="mode"></div>
   </section>
 
   <div class="chiffres" id="chiffres"></div>
 
-  <details class="panneau" id="preferences">
-    <summary>Préférences de rédaction</summary>
-    <div class="volet">
-      <p class="sous">Pour toutes les lettres. Ex. : « Mettre en avant mon parcours académique (prépa, école d'ingénieur, matières). Ne citer le TIPE qu'en une phrase, et seulement s'il est en lien avec le poste. »
-        Le rédacteur n'invente jamais rien : il choisit seulement quoi mettre en avant dans ton profil.</p>
-      <textarea id="consignes" rows="4" aria-label="Préférences de rédaction"></textarea>
-      <div class="actions"><button id="enregistrer-consignes">Enregistrer</button></div>
-    </div>
-  </details>
-
-  <details class="panneau" id="reglages" hidden>
-    <summary>Réglages</summary>
-    <div class="volet">
-      <p class="sous">Zone, secteurs, rythme, dépôts sur place et sur les sites carrière. Écrits dans config.yaml (l'ancienne version est gardée dans config.yaml.precedent). Les clés et mots de passe ne se règlent jamais ici : ils restent dans les variables d'environnement.</p>
-      <div class="grille-reglages" id="champs-reglages"></div>
-      <div class="actions"><button class="principal" id="enregistrer-reglages">Enregistrer les réglages</button></div>
-    </div>
-  </details>
-</aside>
-
-<main>
-  <section id="vue-file" role="tabpanel" aria-labelledby="onglet-file">
+  <section class="vue" id="vue-file" aria-labelledby="titre-vue">
     <div class="outils">
       <select id="filtre-file" aria-label="Afficher">
         <option value="tout">Tout afficher</option>
@@ -484,7 +585,7 @@
     </div>
     <div id="file"></div>
   </section>
-  <section id="vue-candidatures" role="tabpanel" aria-labelledby="onglet-candidatures" hidden>
+  <section class="vue" id="vue-candidatures" aria-labelledby="titre-vue" hidden>
     <div class="outils">
       <input type="text" id="recherche" placeholder="Rechercher une entreprise, un poste, une ville…" aria-label="Rechercher">
       <select id="filtre" aria-label="Filtrer">
@@ -496,8 +597,8 @@
     </div>
     <div id="candidatures"></div>
   </section>
-  <section id="vue-tournee" role="tabpanel" aria-labelledby="onglet-tournee" hidden><div id="tournee"></div></section>
-  <section id="vue-agents" role="tabpanel" aria-labelledby="onglet-agents" hidden>
+  <section class="vue" id="vue-tournee" aria-labelledby="titre-vue" hidden><div id="tournee"></div></section>
+  <section class="vue" id="vue-agents" aria-labelledby="titre-vue" hidden>
     <div class="panneau panneau-pipeline">
       <div class="pipeline" id="pipeline" aria-label="Les agents dans l'ordre du pipeline"></div>
       <div class="retour" id="retour"><span>l'Apprentissage renvoie ses leçons à la Veille, au Scoring et au Critique</span></div>
@@ -512,20 +613,40 @@
     <h2>Les agents en détail</h2>
     <div class="grille-agents" id="grille-agents"></div>
   </section>
+  <section class="vue" id="vue-reglages" aria-labelledby="titre-vue" hidden>
+    <section class="panneau" id="preferences">
+      <div class="panneau-tete">
+        <h2>Préférences de rédaction</h2>
+        <p class="sous">Pour toutes les lettres. Ex. : « Mettre en avant mon parcours académique (prépa, école d'ingénieur, matières). Ne citer le TIPE qu'en une phrase, et seulement s'il est en lien avec le poste. »
+          Le rédacteur n'invente jamais rien : il choisit seulement quoi mettre en avant dans ton profil.</p>
+      </div>
+      <textarea id="consignes" rows="5" aria-label="Préférences de rédaction"></textarea>
+      <div class="actions fin"><button class="principal" id="enregistrer-consignes">Enregistrer</button></div>
+    </section>
+    <section class="panneau" id="reglages" hidden>
+      <div class="panneau-tete">
+        <h2>Paramètres de recherche</h2>
+        <p class="sous">Zone, secteurs, rythme, dépôts sur place et sur les sites carrière. Écrits dans config.yaml (l'ancienne version est gardée dans config.yaml.precedent). Les clés et mots de passe ne se règlent jamais ici : ils restent dans les variables d'environnement.</p>
+      </div>
+      <div class="grille-reglages" id="champs-reglages"></div>
+      <div class="actions fin"><button class="principal" id="enregistrer-reglages">Enregistrer les réglages</button></div>
+    </section>
+  </section>
 </main>
+</div>
 </div>
 <div id="impression"></div>
 <div class="aide" id="aide" hidden role="dialog" aria-label="Raccourcis clavier">
   <h3>Raccourcis clavier</h3>
   <dl>
     <dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>carte suivante, précédente</dd>
-    <dt><kbd>v</kbd></dt><dd>valider</dd>
+    <dt><kbd>v</kbd></dt><dd>valider (annulable 5 s)</dd>
     <dt><kbd>e</kbd></dt><dd>réécrire…</dd>
     <dt><kbd>r</kbd></dt><dd>rejeter</dd>
     <dt><kbd>d</kbd></dt><dd>c'est déposé</dd>
     <dt><kbd>o</kbd></dt><dd>ouvrir le dossier</dd>
-    <dt><kbd>1</kbd> … <kbd>4</kbd></dt><dd>onglets</dd>
-    <dt><kbd>Échap</kbd></dt><dd>fermer un volet, cette aide</dd>
+    <dt><kbd>1</kbd> … <kbd>5</kbd></dt><dd>vues</dd>
+    <dt><kbd>Échap</kbd></dt><dd>annuler, fermer un volet, cette aide</dd>
   </dl>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -538,6 +659,9 @@ const NOMS_STATUTS = {
   relancee: "relancées", entretien: "entretiens", refus: "refus", acceptee: "acceptées", abandonnee: "abandonnées", erreur: "en erreur",
 };
 let cycleEnCours = false;
+// Boutons d'action d'une carte (« Lire la suite » et « Annuler » restent utilisables pendant un cycle).
+const BOUTONS = "button:not(.lire-suite):not(.annuler)";
+const DELAI_VALIDATION = 5;
 
 const el = (balise, attrs = {}, ...enfants) => {
   const n = document.createElement(balise);
@@ -548,6 +672,40 @@ const el = (balise, attrs = {}, ...enfants) => {
   for (const e of enfants.flat()) if (e !== null && e !== undefined && e !== false) n.append(e.nodeType ? e : String(e));
   return n;
 };
+
+const ICONES = {
+  alerte: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+  profil: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  veille: '<path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/>',
+  scoring: '<path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/>',
+  enquete: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  redaction: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  critique: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  envoi: '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
+  suivi: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/>',
+  apprentissage: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
+  boite: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  liste: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+  lieu: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+  agents: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h3.5a3 3 0 0 1 3 3V14"/>',
+  reglages: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+  valise: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
+  calendrier: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  puce: '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  ok: '<path d="M20 6 9 17l-5-5"/>',
+  croix: '<path d="M18 6 6 18M6 6l12 12"/>',
+};
+function icone(nom) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2"); svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.innerHTML = ICONES[nom];
+  return svg;
+}
+document.querySelectorAll("[data-icone]").forEach(n => n.prepend(icone(n.dataset.icone)));
 
 function toast(message, erreur = false) {
   const t = document.getElementById("toast");
@@ -573,42 +731,66 @@ async function rafraichir() {
   return etat;
 }
 
+// Carte de statistique (d'après « App Dashboard Layout » de 21st.dev) : libellé et icône, valeur, aide, jauge facultative.
+function chiffre({ libelle, valeur, icone: nom, aide, jauge, fort }) {
+  const part = jauge && jauge[1] ? Math.min(1, jauge[0] / jauge[1]) : null;
+  return el("div", { class: "chiffre" + (fort ? " fort" : "") },
+    el("div", { class: "chiffre-tete" }, el("span", {}, libelle), nom ? icone(nom) : ""),
+    el("b", {}, valeur),
+    part !== null ? el("div", { class: "jauge" + (part >= 1 ? " pleine" : ""), role: "img", "aria-label": `${Math.round(part * 100)} %` },
+      el("i", { style: `width:${Math.max(2, part * 100)}%` })) : "",
+    aide ? el("span", { class: "sous" }, aide) : "");
+}
+
 function afficherChiffres(etat) {
   const s = etat.statuts;
   const a = etat.autonomie;
   document.getElementById("mode").textContent =
     `Fournisseur : ${etat.fournisseur} · ` + (a.debloquee ? "envoi automatique débloqué"
       : `validation humaine avant envoi (${Math.round(a.taux * 100)} % validés tels quels sur ${a.n}/${a.fenetre})`);
-  const tuiles = [
-    [etat.file.length, "à traiter"],
-    [`${etat.envois[0]}/${etat.envois[1]}`, "envois cette semaine"],
-    [(s.envoyee || 0) + (s.relancee || 0), "candidatures parties"],
-    [s.entretien || 0, "entretiens"],
-    [(s.scoree || 0) + (s.enquetee || 0), "en préparation"],
-    [`${etat.appels_llm[0]}/${etat.appels_llm[1]}`, "appels LLM (semaine)"],
-  ];
-  document.getElementById("chiffres").replaceChildren(...tuiles.map(([v, l], i) =>
-    el("div", { class: "chiffre" + (i === 0 && etat.file.length ? " fort" : "") }, el("b", {}, v), el("span", {}, l))));
+  const parties = (s.envoyee || 0) + (s.relancee || 0);
+  const entretiens = s.entretien || 0;
+  document.getElementById("chiffres").replaceChildren(
+    chiffre({ libelle: "À traiter", valeur: etat.file.length, icone: "boite", aide: "en attente de ta décision", fort: etat.file.length > 0 }),
+    chiffre({ libelle: "Envois", valeur: `${etat.envois[0]}/${etat.envois[1]}`, icone: "envoi", jauge: etat.envois, aide: "cette semaine" }),
+    chiffre({ libelle: "Parties", valeur: parties, icone: "valise", aide: `${(s.scoree || 0) + (s.enquetee || 0)} en préparation` }),
+    chiffre({ libelle: "Entretiens", valeur: entretiens, icone: "calendrier",
+      aide: parties ? `${Math.round(100 * entretiens / parties)} % des candidatures parties` : "pas encore d'envoi" }),
+    chiffre({ libelle: "Appels LLM", valeur: `${etat.appels_llm[0]}/${etat.appels_llm[1]}`, icone: "puce", jauge: etat.appels_llm, aide: "budget de la semaine" }));
 }
 
+let bandeauMasque = null;
 function afficherCycle(c) {
   cycleEnCours = c.en_cours;
   document.getElementById("lancer").disabled = c.en_cours;
-  document.getElementById("lancer-texte").textContent = !c.en_cours ? "Lancer un cycle" : c.nature === "cycle" ? "Cycle en cours…" : "Travail en cours…";
-  document.querySelectorAll(".carte button, .liste button").forEach(b => b.disabled = c.en_cours);
+  document.getElementById("lancer-texte").replaceChildren(...(!c.en_cours ? ["Lancer", el("span", { class: "long" }, " un cycle")]
+    : [c.nature === "cycle" ? "Cycle en cours…" : "Travail en cours…"]));
+  document.querySelectorAll(`.carte ${BOUTONS}, .liste button`).forEach(b => b.disabled = c.en_cours);
   const journal = document.getElementById("journal");
   const lignes = [...c.lignes];
-  if (c.rapport) lignes.push(c.nature === "cycle"
-    ? "Terminé : " + (Object.entries(c.rapport).map(([k, v]) => `${k} ${v}`).join(", ") || "rien à faire")
-    : "Terminé.");
+  let fin = "";
+  if (c.rapport) {
+    fin = c.nature === "cycle" ? Object.entries(c.rapport).map(([k, v]) => `${k} ${v}`).join(", ") || "rien à faire" : "";
+    lignes.push(c.nature === "cycle" ? "Terminé : " + fin : "Terminé.");
+  }
   if (c.erreur) lignes.push("Erreur : " + c.erreur);
+  const bandeau = document.getElementById("bandeau-cycle");
+  const signature = lignes.join("\n");
+  bandeau.hidden = !c.en_cours && (!lignes.length || signature === bandeauMasque);
+  bandeau.className = "bandeau-cycle " + (c.en_cours ? "en-cours" : c.erreur ? "erreur" : "fini");
+  document.getElementById("cycle-titre").textContent = c.en_cours ? (c.nature === "cycle" ? "Cycle en cours" : "Travail en cours")
+    : c.erreur ? "Interrompu" : c.nature === "cycle" ? "Cycle terminé" : "Terminé";
+  document.getElementById("cycle-etat").textContent = c.en_cours ? "Les actions attendent la fin."
+    : c.erreur ? c.erreur.slice(0, 240) : fin || "Le détail est dans le journal.";
+  document.getElementById("cycle-icone").replaceChildren(icone(c.erreur && !c.en_cours ? "alerte" : "ok"));
+  document.getElementById("fermer-bandeau").hidden = c.en_cours;
+  document.getElementById("fermer-bandeau").onclick = () => { bandeauMasque = signature; bandeau.hidden = true; };
   const details = document.getElementById("details-journal");
   details.hidden = !lignes.length;
   if (c.erreur || c.nature !== "cycle" || lignes.some(l => l.startsWith("Arrêt"))) details.open = true;
   afficherEtapes(c);
   journal.textContent = lignes.join("\n");
   journal.scrollTop = journal.scrollHeight;
-  document.getElementById("cycle-etat").textContent = c.en_cours ? "En cours… (les actions attendent la fin)" : "";
 }
 
 // Avancement d'un cycle par étapes, lu dans les lignes du journal.
@@ -636,6 +818,7 @@ function afficherEtapes(c) {
 function afficherFile(elements) {
   const conteneur = document.getElementById("file");
   compteOnglet("file", "À traiter", elements.length);
+  document.title = elements.length ? `(${elements.length}) Recherche de stage` : "Recherche de stage";
   if (document.getElementById("tri-file").value === "score")
     elements = [...elements].sort((a, b) => (b.dossier ? b.dossier.score : 1e9) - (a.dossier ? a.dossier.score : 1e9));
   const cles = new Set(elements.map(e => cle(e)));
@@ -679,6 +862,31 @@ function filtrerFile() {
 document.getElementById("filtre-file").addEventListener("change", filtrerFile);
 document.getElementById("tri-file").addEventListener("change", () => rafraichir());
 
+// Pastille aux initiales de l'entreprise, teinte stable tirée du nom.
+const MOTS_VIDES = new Set(["de", "du", "des", "la", "le", "les", "et", "sa", "sas", "sarl", "l", "d"]);
+function initiales(nom) {
+  const mots = String(nom || "?").split(/[\s'’\-]+/).filter(m => m && !MOTS_VIDES.has(m.toLowerCase()));
+  return (mots.length > 1 ? mots[0][0] + mots[1][0] : (mots[0] || "?").slice(0, 2)).toUpperCase();
+}
+const teinte = nom => [...String(nom)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+
+// Zone de texte repliée au-delà d'une certaine hauteur, avec « Lire la suite » (comme le corps de « Message Draft »).
+function depliable(zone) {
+  const boite = el("div", { class: "depliable" }, zone);
+  if (Number(zone.getAttribute("rows")) <= 16) return [boite];
+  boite.classList.add("long");
+  const texte = el("span", {}, "Lire la suite");
+  const bouton = el("button", { type: "button", class: "fantome lire-suite", "aria-expanded": "false" }, texte, icone("chevron"));
+  const basculer = ouvert => {
+    boite.classList.toggle("ouvert", ouvert);
+    texte.textContent = ouvert ? "Réduire" : "Lire la suite";
+    bouton.setAttribute("aria-expanded", String(ouvert));
+  };
+  bouton.addEventListener("click", () => basculer(!boite.classList.contains("ouvert")));
+  zone.addEventListener("focus", () => basculer(true));
+  return [boite, bouton];
+}
+
 function creerCarte(e) {
   const d = e.dossier;
   const carte = el("article", { class: "carte" });
@@ -696,16 +904,18 @@ function creerCarte(e) {
   }
   const badges = [];
   if (d.critique.iteration) badges.push(el("span", { class: "badge " + (d.critique.note >= 80 ? "ok" : "avert") }, `relecture ${Math.round(d.critique.note)}/100`));
-  if (d.canal === "email") badges.push(el("span", { class: "badge ok", title: d.destinataire }, `mail → ${d.destinataire}`));
-  else if (d.canal) badges.push(el("span", { class: "badge violet" }, "dépôt à la main"));
-  if (d.demarche) badges.push(el("span", { class: "badge", title: d.demarche }, "déjà en contact"));
+  const brouillon = d.version && d.etape !== "depot";  // le destinataire figure alors dans les en-têtes du mail
+  if (d.canal === "email" && !brouillon) badges.push(el("span", { class: "badge ok", title: d.destinataire }, `mail → ${d.destinataire}`));
+  else if (d.canal && d.canal !== "email") badges.push(el("span", { class: "badge violet" }, "dépôt à la main"));
+  if (d.demarche) badges.push(el("span", { class: "badge info", title: d.demarche }, "déjà en contact"));
   if (d.presentiel) badges.push(el("span", { class: "badge ok", title: `${d.presentiel.raison}${d.presentiel.adresse ? " — " + d.presentiel.adresse : ""}` },
     `à déposer sur place · ${Math.round(d.presentiel.distance_km)} km`));
 
   const lien = d.url ? el("span", {}, " · ", el("a", { href: d.url, target: "_blank", rel: "noreferrer" },
     d.type === "spontanee" ? "fiche de l'entreprise ↗" : "voir l'offre ↗")) : "";
   const note = Math.round(d.score);
-  carte.append(el("div", { class: "entete" },
+  carte.append(el("div", { class: "entete-dossier" },
+    el("div", { class: "avatar", style: `--teinte:${teinte(d.entreprise)}`, "aria-hidden": "true" }, initiales(d.entreprise)),
     el("div", {},
       el("div", { class: "surtitre" }, `${SURTITRES[carte.dataset.genre]} · ${d.type === "spontanee" ? "candidature spontanée" : "offre"}`),
       el("h3", {}, d.entreprise), el("div", { class: "sous" }, `${d.intitule} · ${d.lieu}`, lien),
@@ -721,20 +931,27 @@ function creerCarte(e) {
     carte.append(el("ul", { class: "remarques" }, problemes.map(p => el("li", { class: p.gravite }, `${p.gravite} : ${p.raison}`))));
 
   const champs = {};
-  if (d.version && d.etape !== "depot") {
+  if (brouillon) {
     const lecture = !d.modifiable;
-    champs.objet = el("input", { type: "text", "aria-label": "Objet du mail" }); champs.objet.value = d.objet;
-    champs.mail = el("textarea", { rows: lignes(d.mail, 6), "aria-label": "Mail" }); champs.mail.value = d.mail;
-    carte.append(el("label", { class: "champ" }, el("span", {}, "Objet"), champs.objet), el("label", { class: "champ" }, el("span", {}, "Mail"), champs.mail));
+    champs.objet = el("input", { type: "text", class: "nu", "aria-label": "Objet du mail" }); champs.objet.value = d.objet;
+    champs.mail = el("textarea", { class: "nu", rows: lignes(d.mail, 4), "aria-label": "Mail" }); champs.mail.value = d.mail;
+    carte.append(el("section", { class: "brouillon", "aria-label": "Mail" },
+      el("div", { class: "brouillon-titre" }, icone("suivi"), d.canal === "email" ? "Mail" : "Message d'accompagnement"),
+      el("table", { class: "entetes-mail" }, el("tbody", {},
+        d.canal === "email" ? el("tr", {}, el("th", { scope: "row" }, "À"), el("td", {}, d.destinataire)) : "",
+        el("tr", {}, el("th", { scope: "row" }, "Objet"), el("td", {}, champs.objet)))),
+      el("div", { class: "separateur", role: "separator" }),
+      depliable(champs.mail)));
     if (d.lettre) {
-      champs.lettre = el("textarea", { class: "lettre", rows: lignes(d.lettre, 12), "aria-label": "Lettre de motivation" }); champs.lettre.value = d.lettre;
-      carte.append(el("label", { class: "champ" }, el("span", {}, "Lettre de motivation"), champs.lettre));
+      champs.lettre = el("textarea", { class: "nu lettre", rows: lignes(d.lettre, 12), "aria-label": "Lettre de motivation" }); champs.lettre.value = d.lettre;
+      carte.append(el("section", { class: "brouillon papier", "aria-label": "Lettre de motivation" },
+        el("div", { class: "brouillon-titre" }, icone("liste"), "Lettre de motivation",
+          el("a", { href: `/lettre.pdf?dossier=${encodeURIComponent(d.id)}&v=${d.version}`, target: "_blank", rel: "noreferrer",
+            title: "La lettre telle qu'enregistrée, sans tes corrections en cours" }, "PDF ↗")),
+        depliable(champs.lettre)));
     }
     Object.values(champs).forEach(c => { c.readOnly = lecture; c.addEventListener("input", () => marquer(carte, champs, d)); });
   }
-  if (d.lettre && d.version)
-    carte.append(el("p", { class: "sous" }, el("a", { href: `/lettre.pdf?dossier=${encodeURIComponent(d.id)}&v=${d.version}`, target: "_blank", rel: "noreferrer" },
-      "Voir la lettre en PDF ↗"), " (telle qu'enregistrée, sans tes corrections en cours)"));
   if (d.precedente)
     carte.append(el("details", { class: "comparaison" }, el("summary", {}, `Comparer avec la version précédente (v${d.precedente.version} → v${d.version})`),
       [["Objet", d.precedente.objet, d.objet], ["Mail", d.precedente.mail, d.mail], ["Lettre", d.precedente.lettre, d.lettre]]
@@ -763,34 +980,56 @@ function creerCarte(e) {
       d.presentiel.adresse ? el("span", {}, " : ", el("a", { href: "https://www.openstreetmap.org/search?query=" + encodeURIComponent(d.presentiel.adresse),
         target: "_blank", rel: "noreferrer" }, d.presentiel.adresse + " ↗")) : ""));
 
-  const actions = el("div", { class: "actions" });
+  // Pied : remarque « modifié » à gauche, puis Rejeter, les actions secondaires et l'action principale en dernier.
   const bouton = (texte, classe, fn) => el("button", { class: classe, onclick: fn }, texte);
-  let rejet = null;
-  for (const a of e.actions) {
-    if (a === "valider") actions.append(bouton("Valider", "principal", () => agir(carte, { action: "valider", dossier: d.id, ...valeurs(champs) })));
-    if (a === "remplir") actions.append(bouton("Remplir pour moi", "principal", () => agir(carte, { action: "remplir", dossier: d.id }, false)
-      .then(() => { setTimeout(suivreCycle, 300); setTimeout(suivreDepots, 3000); })));
-    if (a === "deposer") actions.append(bouton("C'est déposé", "", () => tiroir(carte, {
-      titre: "Où l'as-tu déposée ?", puces: ["site carrières", "formulaire de contact", "en main propre", "par courrier"],
-      remplacer: true, valeur: d.depot && d.depot.etat === "confirme" ? `site carrières (${d.depot.url})` : "site carrières",
-      libelle: "Enregistrer le dépôt", classe: "principal",
-    }, preuve => agir(carte, { action: "deposer", dossier: d.id, preuve: `${preuve || "déposée"}, ${new Date().toLocaleDateString("fr-FR")}` }))));
-    if (a === "ouvrir") actions.append(bouton("Ouvrir le dossier", "", () => agir(carte, { action: "ouvrir", dossier: d.id }, false)));
-    if (a === "fermer") actions.append(bouton("C'est noté, retirer", "", () => agir(carte, { action: "fermer", escalade: e.escalade })));
-    if (a === "reecrire") actions.append(bouton("Réécrire…", "", () => tiroir(carte, {
+  const fabriques = {
+    rejeter: () => bouton("Rejeter", "fantome danger", () => tiroir(carte, {
+      titre: `Pourquoi écarter ${d.entreprise} ? Le motif apparaît dans le bilan hebdomadaire pour mieux cibler ensuite (facultatif).`,
+      puces: ["trop loin", "hors de mes secteurs", "entreprise trop grande", "poste pas adapté", "déjà en contact"],
+      remplacer: true, libelle: "Rejeter", classe: "principal",
+    }, motif => agir(carte, { action: "rejeter", dossier: d.id, motif }))),
+    ouvrir: () => bouton("Ouvrir le dossier", "fantome", () => agir(carte, { action: "ouvrir", dossier: d.id }, false)),
+    fermer: () => bouton("C'est noté, retirer", "", () => agir(carte, { action: "fermer", escalade: e.escalade })),
+    reecrire: () => bouton("Réécrire…", "", () => tiroir(carte, {
       titre: "Que changer ? Clique une ou plusieurs idées, ou écris ta consigne. Rien ne sera inventé.",
       puces: ["Plus court", "Plus technique", "Plus centré sur l'entreprise, moins générique", "Mettre en avant ma formation", "Ton plus direct"],
       placeholder: "ex. moins sur le TIPE, plus sur mon parcours académique", requis: true, libelle: "Lancer la réécriture", classe: "principal",
-    }, consigne => agir(carte, { action: "reecrire", dossier: d.id, consigne }))));
-    if (a === "rejeter") rejet = bouton("Rejeter", "danger", () => tiroir(carte, {
-      titre: `Pourquoi écarter ${d.entreprise} ? Le motif apparaît dans le bilan hebdomadaire pour mieux cibler ensuite (facultatif).`,
-      puces: ["trop loin", "hors de mes secteurs", "entreprise trop grande", "poste pas adapté", "déjà en contact"],
-      remplacer: true, libelle: "Rejeter", classe: "danger",
-    }, motif => agir(carte, { action: "rejeter", dossier: d.id, motif })));
-  }
-  actions.append(el("span", { class: "modifie" }, "modifié : tes corrections seront enregistrées"), rejet);
+    }, consigne => agir(carte, { action: "reecrire", dossier: d.id, consigne }))),
+    deposer: () => bouton("C'est déposé", "", () => tiroir(carte, {
+      titre: "Où l'as-tu déposée ?", puces: ["site carrières", "formulaire de contact", "en main propre", "par courrier"],
+      remplacer: true, valeur: d.depot && d.depot.etat === "confirme" ? `site carrières (${d.depot.url})` : "site carrières",
+      libelle: "Enregistrer le dépôt", classe: "principal",
+    }, preuve => agir(carte, { action: "deposer", dossier: d.id, preuve: `${preuve || "déposée"}, ${new Date().toLocaleDateString("fr-FR")}` }))),
+    remplir: () => bouton("Remplir pour moi", "principal", () => agir(carte, { action: "remplir", dossier: d.id }, false)
+      .then(() => { setTimeout(suivreCycle, 300); setTimeout(suivreDepots, 3000); })),
+    valider: () => bouton("Valider", "principal", () => validerApresDelai(carte, () => ({ action: "valider", dossier: d.id, ...valeurs(champs) }))),
+  };
+  const actions = el("div", { class: "actions" }, el("span", { class: "modifie" }, "modifié : tes corrections seront enregistrées"));
+  for (const a of ["rejeter", "fermer", "ouvrir", "reecrire", "deposer", "remplir", "valider"])
+    if (e.actions.includes(a)) actions.append(fabriques[a]());
   carte.append(actions);
   return carte;
+}
+
+// Validation différée : quelques secondes pour annuler un clic de trop (comme l'envoi différé de « Message Draft »).
+function validerApresDelai(carte, donnees) {
+  if (carte.querySelector(".differe")) return;
+  const pied = carte.querySelector(":scope > .actions");
+  let reste = DELAI_VALIDATION;
+  const compte = el("span", { class: "sous" }, `Validation dans ${reste} s`);
+  const annuler = el("button", { class: "pilule petit annuler" }, "Annuler");
+  const bandeau = el("div", { class: "differe", "aria-live": "polite" }, compte, annuler);
+  const arreter = () => { clearInterval(tic); clearTimeout(fin); bandeau.remove(); pied.hidden = false; };
+  const tic = setInterval(() => { reste -= 1; compte.textContent = `Validation dans ${Math.max(reste, 0)} s`; }, 1000);
+  const fin = setTimeout(() => {
+    arreter();
+    if (cycleEnCours) return toast("Un cycle a démarré : valide à nouveau quand il sera fini.", true);
+    agir(carte, donnees());
+  }, DELAI_VALIDATION * 1000);
+  annuler.addEventListener("click", () => { arreter(); pied.querySelector("button.principal")?.focus(); });
+  pied.hidden = true;
+  pied.after(bandeau);
+  annuler.focus();
 }
 
 // Avancement du remplissage sur le site carrière (écrit par le processus du navigateur).
@@ -829,7 +1068,7 @@ function marquer(carte, champs, d) {
 }
 
 async function agir(carte, donnees, retirer = true) {
-  carte.querySelectorAll("button").forEach(b => b.disabled = true);
+  carte.querySelectorAll(BOUTONS).forEach(b => b.disabled = true);
   try {
     toast(await poster("/api/action", donnees));
     if (retirer) carte.remove();
@@ -837,7 +1076,7 @@ async function agir(carte, donnees, retirer = true) {
   } catch (err) {
     toast(err.message, true);
   } finally {
-    carte.querySelectorAll("button").forEach(b => b.disabled = cycleEnCours);
+    carte.querySelectorAll(BOUTONS).forEach(b => b.disabled = cycleEnCours);
     await rafraichir();
   }
 }
@@ -869,7 +1108,8 @@ function difference(avant, apres) {
 // Volet intégré à la carte (remplace les fenêtres prompt()).
 function tiroir(carte, o, envoyer) {
   carte.querySelector(".tiroir")?.remove();
-  carte.querySelector(":scope > .actions").hidden = false;
+  const principales = carte.querySelector(":scope > .actions");
+  principales.hidden = false;
   const zone = el("textarea", { rows: 2, placeholder: o.placeholder || "", "aria-label": o.titre });
   zone.value = o.valeur || "";
   const ajouter = t => {
@@ -882,34 +1122,59 @@ function tiroir(carte, o, envoyer) {
     el("div", { class: "puces" }, o.puces.map(t => el("button", { type: "button", class: "puce", onclick: () => ajouter(t) }, t))),
     zone,
     el("div", { class: "actions" },
+      el("button", { class: "fantome annuler", onclick: () => { boite.remove(); principales.hidden = false; } }, "Annuler"),
       el("button", { class: o.classe || "", onclick: () => {
         if (o.requis && !zone.value.trim()) { zone.focus(); toast("Écris ou choisis ce qu'il faut changer.", true); return; }
         envoyer(zone.value.trim());
-      } }, o.libelle),
-      el("button", { onclick: () => { boite.remove(); principales.hidden = false; } }, "Annuler")));
-  const principales = carte.querySelector(":scope > .actions");
+      } }, o.libelle)));
   principales.before(boite);
   principales.hidden = true;  // un seul jeu de boutons à la fois
   zone.focus();
 }
 
-// ---------------------------------------------------------------- onglets
+// ---------------------------------------------------------------- vues
 function compteOnglet(vue, texte, n, attention = false) {
-  document.getElementById("onglet-" + vue).replaceChildren(texte, n ? el("span", { class: "compte" + (attention ? " attention" : "") }, n) : "");
+  const compte = document.querySelector(`#onglet-${vue} .compte`);
+  compte.textContent = n || ""; compte.hidden = !n; compte.classList.toggle("attention", attention);
 }
-const VUES = ["file", "candidatures", "tournee", "agents"];
+const VUES = ["file", "candidatures", "tournee", "agents", "reglages"];
+const TITRES = {
+  file: ["À traiter", "Relis, corrige si besoin, puis valide ou écarte."],
+  candidatures: ["Mes candidatures", "Tout ce qui est validé ou parti, avec les relances prévues."],
+  tournee: ["Sur place", "Les candidatures à déposer en main propre, dans l'ordre de la tournée."],
+  agents: ["Agents", "Ce que fait chaque agent, les sources de la Veille et le bilan."],
+  reglages: ["Réglages", "Préférences de rédaction et paramètres de recherche."],
+};
 function montrerVue() {
   const vue = VUES.includes(location.hash.slice(1)) ? location.hash.slice(1) : "file";
   for (const v of VUES) {
     document.getElementById("vue-" + v).hidden = v !== vue;
-    document.getElementById("onglet-" + v).setAttribute("aria-selected", String(v === vue));
+    const onglet = document.getElementById("onglet-" + v);
+    if (v === vue) onglet.setAttribute("aria-current", "page"); else onglet.removeAttribute("aria-current");
   }
+  document.getElementById("titre-vue").textContent = TITRES[vue][0];
+  document.getElementById("desc-vue").textContent = TITRES[vue][1];
+  document.getElementById("chiffres").hidden = vue === "reglages";
+  basculerMenu(false);
   if (vue === "agents") chargerAgents(true);
 }
-document.querySelectorAll(".onglets button").forEach(b => b.addEventListener("click", () => {
-  history.replaceState(null, "", "#" + b.dataset.vue); montrerVue();
-}));
+function allerA(vue) { history.replaceState(null, "", "#" + vue); montrerVue(); }
+document.querySelectorAll(".menu button").forEach(b => b.addEventListener("click", () => allerA(b.dataset.vue)));
 window.addEventListener("hashchange", montrerVue);
+
+// Barre latérale en volet sur petit écran.
+function basculerMenu(ouvert) {
+  document.getElementById("coque").classList.toggle("menu-ouvert", ouvert);
+  document.getElementById("voile").hidden = !ouvert;
+  document.getElementById("ouvrir-menu").setAttribute("aria-expanded", String(ouvert));
+}
+document.getElementById("ouvrir-menu").addEventListener("click", () => basculerMenu(true));
+document.getElementById("voile").addEventListener("click", () => basculerMenu(false));
+// Menu des options du cycle : se ferme au clic ailleurs.
+document.addEventListener("click", ev => {
+  const options = document.getElementById("options-cycle");
+  if (options.open && !options.contains(ev.target)) options.open = false;
+});
 montrerVue();
 
 const jour = v => v ? new Date(String(v).replace(" ", "T")) : null;
@@ -1036,18 +1301,6 @@ function imprimerTournee() {
 }
 
 // -------------------------------------------------------------------- agents
-const ICONES = {
-  alerte: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
-  profil: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
-  veille: '<path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/>',
-  scoring: '<path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/>',
-  enquete: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
-  redaction: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
-  critique: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
-  envoi: '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
-  suivi: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/>',
-  apprentissage: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
-};
 const LIBELLES_AGENTS = { profil: "Profil", veille: "Veille", scoring: "Scoring", enquete: "Enquête", redaction: "Rédaction",
   critique: "Critique", envoi: "Envoi", suivi: "Suivi", apprentissage: "Apprentissage" };
 var donneesAgents = null, dernierCycle = null, chargementAgents = 0, signaturesAgents = {};
@@ -1055,15 +1308,6 @@ var donneesAgents = null, dernierCycle = null, chargementAgents = 0, signaturesA
 function siChange(cle, donnees, dessiner) {
   const s = JSON.stringify([donnees, cycleEnCours]);
   if (signaturesAgents[cle] !== s) { signaturesAgents[cle] = s; dessiner(); }
-}
-
-function icone(nom) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "2"); svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round");
-  svg.setAttribute("aria-hidden", "true");
-  svg.innerHTML = ICONES[nom];
-  return svg;
 }
 
 function ilYa(v) {
@@ -1160,8 +1404,8 @@ function dessinerPropositions(d) {
       await rafraichir(); chargerAgents(true);
     };
     carte.append(el("div", { class: "actions" },
-      el("button", { class: "principal", disabled: cycleEnCours || null, onclick: () => decider("appliquer") }, "Appliquer"),
-      el("button", { disabled: cycleEnCours || null, onclick: () => decider("refuser") }, "Refuser")));
+      el("button", { class: "fantome", disabled: cycleEnCours || null, onclick: () => decider("refuser") }, "Refuser"),
+      el("button", { class: "principal", disabled: cycleEnCours || null, onclick: () => decider("appliquer") }, "Appliquer")));
     return carte;
   }) : [el("div", { class: "vide" }, "Aucune proposition en attente. L'Apprentissage en fait au bilan hebdomadaire, quand il a assez de résultats (réponses, rejets, corrections).")]));
 
@@ -1209,9 +1453,9 @@ function dessinerBilan(d) {
   const panneau = (titre, contenu, vide) => el("div", { class: "panneau" }, el("h3", {}, titre),
     contenu ? contenu : el("p", { class: "sous" }, vide));
   document.getElementById("bilan").replaceChildren(
-    el("div", { class: "chiffres", style: "margin-top:0" },
-      [[b.abouties, "candidatures avec un résultat"], [b.entretiens, "entretiens"], [b.refus, "refus"], [b.silences, "sans réponse après 30 j"]]
-        .map(([v, l]) => el("div", { class: "chiffre" }, el("b", {}, v), el("span", {}, l)))),
+    el("div", { class: "chiffres" },
+      [[b.abouties, "Avec un résultat"], [b.entretiens, "Entretiens"], [b.refus, "Refus"], [b.silences, "Sans réponse après 30 j"]]
+        .map(([v, l]) => chiffre({ libelle: l, valeur: v }))),
     el("div", { class: "deux-colonnes" },
       panneau("Pourquoi tu écartes des pistes", b.motifs_rejet.length ? barres(b.motifs_rejet, l => l.n, l => l.texte, l => `${l.n}×`) : null,
         "Aucun motif encore : donne-en un quand tu rejettes une candidature, il apparaîtra ici."),
@@ -1254,6 +1498,7 @@ function activer(carte) {
   carte.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 function cliquer(carte, debut) {
+  if (carte.querySelector(".differe")) return;  // validation déjà en cours d'attente
   const bouton = [...carte.querySelectorAll(":scope > .actions button")].find(b => b.textContent.startsWith(debut) && !b.disabled);
   if (bouton) bouton.click(); else toast("Action indisponible pour cette carte.", true);
 }
@@ -1261,13 +1506,17 @@ document.addEventListener("keydown", ev => {
   const aide = document.getElementById("aide");
   if (ev.key === "Escape") {
     if (!aide.hidden) { aide.hidden = true; return; }
-    const tiroirOuvert = ev.target.closest?.(".carte")?.querySelector(".tiroir") || document.querySelector(".carte.active .tiroir");
-    tiroirOuvert?.querySelector(".actions button:last-child")?.click();
+    const options = document.getElementById("options-cycle");
+    if (options.open) { options.open = false; return; }
+    if (document.getElementById("coque").classList.contains("menu-ouvert")) { basculerMenu(false); return; }
+    // Annule ce qui est en cours sur la carte : validation différée ou volet ouvert.
+    const carte = ev.target.closest?.(".carte") || document.querySelector(".carte.active");
+    carte?.querySelector(".differe .annuler, .tiroir .annuler")?.click();
     return;
   }
   if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.target.closest("input, textarea, select, [contenteditable]")) return;
   if (ev.key === "?") { aide.hidden = !aide.hidden; return; }
-  if (["1", "2", "3", "4"].includes(ev.key)) { history.replaceState(null, "", "#" + VUES[ev.key - 1]); montrerVue(); return; }
+  if (["1", "2", "3", "4", "5"].includes(ev.key)) { allerA(VUES[ev.key - 1]); return; }
   if (document.getElementById("vue-file").hidden) return;
   const cartes = cartesVisibles();
   const active = cartes.find(c => c.classList.contains("active"));
@@ -1294,7 +1543,7 @@ function notifier(titre, texte) {
 // ------------------------------------------------------ vérifications
 async function verifier() {
   const zone = document.getElementById("verifs");
-  zone.replaceChildren(el("span", { class: "sous" }, "Vérification avant cycle…"));
+  zone.replaceChildren(el("p", { class: "sous", style: "margin:0;padding:0 10px" }, "Vérification…"));
   let points;
   try {
     const r = await fetch("/api/verifier", { method: "POST", headers: { "Content-Type": "application/json", "X-Jeton": JETON }, body: "{}" });
@@ -1308,12 +1557,14 @@ async function verifier() {
     const caseACocher = document.getElementById(caseId);
     if (p && p.ok === false && caseACocher.checked) { caseACocher.checked = false; notes.push(texte); }
   }
-  zone.replaceChildren(
-    ...points.map(p => el("span", { class: "verif " + classe(p), title: p.detail || "" }, p.titre)),
-    el("button", { onclick: verifier }, "Revérifier"),
-    points.some(p => p.cle === "llm" && p.ok) ? el("button", { onclick: testerLLM, title: "Un tout petit appel, compté dans le budget de la semaine" }, "Tester le LLM") : "");
+  document.getElementById("ouvrir-menu").classList.toggle("signal", points.some(p => p.ok === false));
   const details = points.filter(p => p.ok !== true && p.detail).map(p => `${p.titre} : ${p.detail}`).concat(notes);
-  if (details.length) zone.append(el("ul", { class: "verifs-details", style: "flex-basis:100%" }, details.map(t => el("li", {}, t))));
+  zone.replaceChildren(
+    el("ul", { class: "liste-verifs" }, points.map(p => el("li", { class: "verif " + classe(p), title: p.detail || "" }, p.titre))),
+    details.length ? el("ul", { class: "verifs-details" }, details.map(t => el("li", {}, t))) : "",
+    el("div", { class: "verifs-boutons" },
+      el("button", { class: "petit", onclick: verifier }, "Revérifier"),
+      points.some(p => p.cle === "llm" && p.ok) ? el("button", { class: "petit", onclick: testerLLM, title: "Un tout petit appel, compté dans le budget de la semaine" }, "Tester le LLM") : ""));
 }
 async function testerLLM() {
   try { toast(await poster("/api/tester-llm", {})); suivreCycle(); } catch (err) { toast(err.message, true); }
@@ -1344,6 +1595,7 @@ document.getElementById("enregistrer-reglages").addEventListener("click", async 
 
 document.getElementById("lancer").addEventListener("click", async () => {
   demanderNotifications();
+  document.getElementById("options-cycle").open = false;
   try {
     toast(await poster("/api/cycle", { sans_suivi: !document.getElementById("suivi").checked, sans_envoi: !document.getElementById("envoi").checked }));
     suivreCycle();
@@ -1370,7 +1622,6 @@ document.getElementById("enregistrer-consignes").addEventListener("click", async
 
 rafraichir().then(etat => {
   document.getElementById("consignes").value = etat.consignes;
-  if (etat.consignes) document.getElementById("preferences").open = true;
   afficherReglages(etat.reglages);
   if (etat.cycle.en_cours) suivreCycle();
   if (etat.file.some(e => e.dossier && e.dossier.depot && e.dossier.depot.actif)) suivreDepots();
