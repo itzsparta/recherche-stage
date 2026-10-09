@@ -25,6 +25,8 @@ from .agents.scoring import AgentScoring
 from .agents.suivi import AgentSuivi
 from .agents.veille import AgentVeille
 from .canaux.messagerie import Boite, Expediteur
+from .demarches import Demarche, ErreurDemarches
+from .demarches import charger as charger_demarches
 from .depot import lancement
 from .llm import BudgetEpuise, ErreurLLM, NonConnecte, QuotaEpuise
 from .modeles import Critique, Dossier, Envoi, Statut
@@ -140,6 +142,7 @@ class Orchestrateur:
             rapport["budget_epuise"] += 1
             self._escalader(None, "budget", f"{e}. Le pipeline reprendra lundi (ou relever appels_api_max_par_semaine).")
         self.activite(None)
+        rapport["rappels_demarches"] += self.rappeler_demarches()
         self.store.journaliser(self.nom, "cycle", details=dict(rapport))
         self.mettre_a_jour_excel()  # même après un arrêt sur quota : le travail fait y figure
         return rapport
@@ -252,6 +255,31 @@ class Orchestrateur:
             self.store.save(d)
         return conseilles
 
+    def demarches(self) -> list[Demarche]:
+        """Démarches faites hors de l'outil (demarches.yaml) ; un fichier invalide est signalé, pas bloquant."""
+        try:
+            return charger_demarches(self.ctx.config.suivi.demarches)
+        except ErreurDemarches as e:
+            self._escalader(None, "demarches", f"{e}. Démarches ignorées tant que le fichier n'est pas corrigé.")
+            return []
+
+    def rappeler_demarches(self) -> int:
+        """Relances prévues dans demarches.yaml et arrivées à échéance : une alerte
+        chacune dans la file d'attente, une seule fois par date."""
+        aujourd_hui = self.ctx.horloge().date()
+        faits = set(self.store.parametre("rappels_demarches", []) or [])
+        nouveaux = 0
+        for dm in self.demarches():
+            cle = f"{dm.entreprise}|{dm.relance}"
+            if dm.relance and dm.relance <= aujourd_hui and cle not in faits:
+                self._escalader(None, f"relance:{dm.entreprise}",
+                                f"Relance prévue le {dm.relance:%d/%m/%Y} : {dm.entreprise} ({dm.resume()}).")
+                faits.add(cle)
+                nouveaux += 1
+        if nouveaux:
+            self.store.definir_parametre("rappels_demarches", sorted(faits))
+        return nouveaux
+
     def mettre_a_jour_excel(self) -> str:
         """Reporte les candidatures dans le tableau Excel de l'utilisateur, s'il en a un."""
         try:
@@ -264,7 +292,8 @@ class Orchestrateur:
         from .excel import ErreurExcel, mettre_a_jour
 
         try:
-            ajoutees, maj = mettre_a_jour(chemin, self.store.lister(), self.ctx.config.suivi.excel_feuille)
+            ajoutees, maj = mettre_a_jour(chemin, self.store.lister(), self.ctx.config.suivi.excel_feuille,
+                                          self.demarches())
         except (ErreurExcel, OSError, KeyError) as e:
             message = f"Tableau Excel non mis à jour : {e}"
             self.store.journaliser(self.nom, "excel_erreur", details={"erreur": str(e)})

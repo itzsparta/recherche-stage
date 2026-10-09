@@ -182,7 +182,15 @@ class Application:
             "recherche": f"https://duckduckgo.com/?q={quote_plus(o.entreprise + ' recrutement stage candidature')}",
             "page_carriere": d.fiche_entreprise.page_carriere,
             "depot": self._etat_depot(d.id) if d.etape_attente == "depot" else None,
+            "demarche": self._demarche(d),
         }
+
+    def _demarche(self, d: Dossier) -> str:
+        """Démarche déjà faite hors de l'outil chez cette entreprise (forum, recommandation…)."""
+        from .demarches import charger_si_change, correspondance
+
+        demarche = correspondance(charger_si_change(self.ctx.config.suivi.demarches), d.offre.entreprise, d.offre.lieu)
+        return f"{demarche.entreprise} : {demarche.resume()}" if demarche else ""
 
     def _depot_actif(self, dossier_id: str) -> bool:
         processus = self.depots.get(dossier_id)

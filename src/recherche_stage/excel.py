@@ -72,6 +72,14 @@ MOTS_STATUT = {
     Statut.refus: ("refus", "non retenu", "negati", "rejet"),
     Statut.acceptee: ("accept", "retenu", "positi", "obtenu", "valide"),
 }
+# Démarches faites hors de l'outil (demarches.yaml) : statut → mots cherchés dans la liste, libellé sans liste.
+# « En attente » ou « Contact » absents de la liste : la case reste vide, la démarche est dans les notes.
+STATUTS_DEMARCHE = {
+    "envoyee": (MOTS_STATUT[Statut.envoyee], "Envoyée"),
+    "en_attente": (("attente", "en cours"), "En attente"),
+    "a_faire": (("a faire", "a envoyer", "a postuler"), "À faire"),
+    "contact": (("contact", "forum", "rencontr"), "Contact"),
+}
 LIBELLES_REPONSE = {"refus": "Refus", "entretien": "Entretien", "demande_info": "Demande d'informations"}
 
 
@@ -225,6 +233,16 @@ def valeurs(d: Dossier) -> dict[str, object]:
     }
 
 
+def valeurs_demarche(dm) -> dict[str, object]:
+    quand = f" ({dm.date:%d/%m/%Y})" if dm.date else ""
+    notes = f"{dm.canal}{quand} : {dm.notes}" if dm.canal else dm.notes
+    return {
+        "entreprise": dm.entreprise, "lieu": dm.lieu, "secteur": dm.activite, "canal": dm.canal,
+        "contact": dm.contact, "date_candidature": dm.date if dm.statut == "envoyee" else None,
+        "relance": dm.relance, "remarques": notes.strip(" :"),
+    }
+
+
 def _ajouter_colonne(ws, ligne_entete: int, intitule: str) -> int:
     """Ajoute une colonne après la dernière colonne titrée, dans le style de l'en-tête
     voisin, et l'intègre au tableau Excel mis en forme qui s'arrêtait juste avant."""
@@ -260,8 +278,11 @@ def _surligner(cellule) -> None:
     cellule.font = Font(color=VERT["police"], bold=True)
 
 
-def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | None = None) -> tuple[int, int]:
-    """Met le tableau à jour ; renvoie (lignes ajoutées, lignes mises à jour)."""
+def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | None = None,
+                  demarches: list = ()) -> tuple[int, int]:
+    """Met le tableau à jour ; renvoie (lignes ajoutées, lignes mises à jour). Les
+    démarches faites hors de l'outil ont chacune leur ligne ; sur une ligne
+    existante, elles ne remplissent que les cases vides."""
     try:
         from openpyxl import load_workbook
     except ImportError as e:
@@ -356,6 +377,45 @@ def mettre_a_jour(chemin: str | Path, dossiers: list[Dossier], feuille: str | No
         if autres and "remarques" in colonnes and ws.cell(ligne, colonnes["remarques"]).value in (None, ""):
             n, nom = autres[0]  # même entreprise ailleurs dans le tableau (autre site) : à toi de voir
             ws.cell(ligne, colonnes["remarques"]).value = f"Même entreprise que la ligne {n} ({nom}) ?"
+
+    departements = {}  # ligne -> département écrit dans le tableau
+    if "lieu" in colonnes:
+        departements = {n: _departement(ws.cell(n, colonnes["lieu"]).value) for n in range(ligne_entete + 1, derniere + 1)}
+    for dm in demarches:
+        ligne = existantes.get(cle(dm.entreprise, ""))
+        if ligne is not None and _departement(dm.lieu) and departements.get(ligne) not in ("", None, _departement(dm.lieu)):
+            ligne = None  # même nom, autre site (« ENGIE » du Nord n'est pas celui de la Somme)
+        if ligne is None and "poste" not in colonnes:
+            ligne = coeurs.get((_coeur(dm.entreprise), _departement(dm.lieu)))
+        nouvelle = ligne is None
+        if nouvelle:
+            derniere += 1
+            ligne = derniere
+            existantes[cle(dm.entreprise, "")] = ligne
+            if ligne - 1 > ligne_entete:
+                for col in range(1, ws.max_column + 1):
+                    source, cible = ws.cell(ligne - 1, col), ws.cell(ligne, col)
+                    if source.has_style:
+                        cible._style = copy(source._style)
+            ajoutees += 1
+        else:
+            maj += 1
+        champs = valeurs_demarche(dm)
+        for champ, col in colonnes.items():
+            cellule = ws.cell(ligne, col)
+            if not nouvelle and cellule.value not in (None, ""):
+                continue  # le tableau est à toi : une démarche ne remplit que les cases vides
+            if champ == "statut":
+                mots, libelle = STATUTS_DEMARCHE[dm.statut]
+                liste = _liste_deroulante(ws, cellule)
+                valeur = _choisir(liste, mots, "") if liste else libelle
+            else:
+                valeur = champs.get(champ)
+            if valeur in (None, ""):
+                continue
+            cellule.value = valeur
+            if isinstance(valeur, date) and cellule.number_format == "General":
+                cellule.number_format = "DD/MM/YYYY"
 
     for table in ws.tables.values():  # tableau Excel mis en forme : on l'étend aux nouvelles lignes
         debut, fin = table.ref.split(":")

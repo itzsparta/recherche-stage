@@ -202,6 +202,24 @@ Quand aucune adresse mail publique n'existe, la carte propose « Remplir pour mo
 
 L'envoi est réservé dès l'ouverture : jamais deux candidatures pour le même dossier.
 
+### Démarches faites hors de l'outil : forum, recommandation
+
+`demarches.yaml` (créé par `rs init`, modèle commenté) liste ce qui s'est passé
+ailleurs : stands d'un forum, contact rencontré, candidature envoyée à la main.
+Pour chaque démarche : entreprise, statut (`envoyee`, `en_attente`, `a_faire` ou
+`contact`), date, canal, contact, lieu, notes et une date de relance facultative.
+
+- `rs excel` lui donne une ligne dans le tableau ; sur une ligne déjà là, seules
+  les cases vides sont remplies.
+- Statut `envoyee`, `en_attente` ou `a_faire` : jamais de candidature spontanée
+  automatique chez cette entreprise. Une offre de stage chez elle reste proposée,
+  en tête de liste, et sa carte rappelle la démarche.
+- Statut `contact` (stand visité) : rien n'est bloqué, ses offres passent en tête.
+- À la date de relance, un rappel apparaît dans `rs file` et dans l'interface.
+
+`rs demarches` affiche ce qui a été compris. Le fichier reste sur ton ordinateur
+(exclu de git) : il contient des noms et des adresses de contacts.
+
 Pour un fonctionnement autonome, planifier `rs cycle` deux fois par jour
 (Planificateur de tâches Windows, ou `cron`). Le système ne collecte une
 source qu'une fois toutes les 12 h et n'envoie qu'en matinée, du lundi au
@@ -291,6 +309,8 @@ des propositions :
 - Sur l'offre gratuite de l'API Gemini, Google peut utiliser les contenus pour
   améliorer ses produits : préférer une clé liée à un compte de facturation.
 - L'annuaire ne conserve que des données d'entreprise, jamais les dirigeants.
+- `demarches.yaml` (contacts rencontrés) reste local et n'est jamais envoyé au
+  modèle de langage.
 - `rs rgpd export` exporte tout ; `rs rgpd purger` supprime les dossiers
   terminés depuis plus de `conservation_mois` (12 par défaut).
 - Le correcteur LanguageTool, optionnel, doit tourner en local.

@@ -1,6 +1,6 @@
 """Interface en ligne de commande : `rs <commande>`.
 
-    rs init                          crée config.yaml, preferences.yaml et le dossier imports/
+    rs init                          crée config.yaml, preferences.yaml, demarches.yaml et le dossier imports/
     rs profil --cv cv.pdf            agent Profil (CV en PDF, DOCX ou texte ; relevés ; préférences)
     rs cycle                         un passage complet du pipeline
     rs file                          ce qui attend une décision humaine
@@ -14,6 +14,7 @@
     rs interface                     interface dans le navigateur : cycle, relecture, validation
     rs consignes [texte]             préférences de rédaction pour toutes les lettres (ex. parcours avant projets)
     rs excel                         met à jour le tableau Excel de suivi (suivi.excel)
+    rs demarches                     démarches faites hors de l'outil (forum, recommandation) et leur effet
     rs revue                         passe la file en revue : valider, corriger, rejeter, déposer
     rs fermer <n°> [note]            retire un élément de rs file (alerte traitée)
     rs reprendre-enquetes            relance l'Enquête des dossiers non rédigés à fiche minimale
@@ -89,7 +90,7 @@ def construire(chemin_config: str) -> tuple[Contexte, Orchestrateur]:
 
 
 def cmd_init(args) -> None:
-    for nom in ("config.yaml", "preferences.yaml"):
+    for nom in ("config.yaml", "preferences.yaml", "demarches.yaml"):
         cible = Path(nom)
         if cible.exists():
             print(f"{nom} existe déjà, conservé")
@@ -156,6 +157,28 @@ def cmd_consignes(args) -> None:
 def cmd_excel(args) -> None:
     _, orchestrateur = construire(args.config)
     print(orchestrateur.mettre_a_jour_excel() or "Aucun tableau : renseigner suivi.excel dans config.yaml")
+
+
+def cmd_demarches(args) -> None:
+    from .demarches import ErreurDemarches, charger, correspondance
+
+    ctx, _ = construire(args.config)
+    chemin = ctx.config.suivi.demarches
+    try:
+        demarches = charger(chemin)
+    except ErreurDemarches as e:
+        sys.exit(str(e))
+    if not demarches:
+        sys.exit(f"Aucune démarche : {chemin} absent ou vide (modèle : rs init)")
+    effets = {"envoyee": "pas de spontanée en double", "en_attente": "pas de spontanée en double",
+              "a_faire": "pas de spontanée en double", "contact": "offres et spontanées prioritaires"}
+    print(f"{len(demarches)} démarche(s) lues dans {chemin} :")
+    for dm in demarches:
+        relance = f" ; rappel le {dm.relance:%d/%m/%Y}" if dm.relance else ""
+        print(f"- {dm.entreprise} [{dm.statut}] {dm.resume()}\n    → {effets[dm.statut]}{relance}")
+    dossiers = [d for d in ctx.store.lister() if correspondance(demarches, d.offre.entreprise, d.offre.lieu)]
+    if dossiers:
+        print("Dossiers de l'outil concernés : " + ", ".join(f"{d.offre.entreprise} ({d.statut.value})" for d in dossiers))
 
 
 def cmd_revue(args) -> None:
@@ -316,6 +339,7 @@ def main(argv: list[str] | None = None) -> None:
     sous.add_parser("file").set_defaults(func=cmd_file)
     sous.add_parser("revue").set_defaults(func=cmd_revue)
     sous.add_parser("excel").set_defaults(func=cmd_excel)
+    sous.add_parser("demarches").set_defaults(func=cmd_demarches)
     p = sous.add_parser("consignes")
     p.add_argument("texte", nargs="*")
     p.set_defaults(func=cmd_consignes)

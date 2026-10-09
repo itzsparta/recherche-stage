@@ -293,6 +293,15 @@ class AgentScoring(Agent):
         if o.type == "offre" and o.date_publication and aujourd_hui - o.date_publication > expiration:
             return self._abandonner(dossier, f"expiree : publiée le {o.date_publication}", entrees)
 
+        from ..demarches import charger_si_change, correspondance
+
+        demarche = correspondance(charger_si_change(self.ctx.config.suivi.demarches), o.entreprise, o.lieu)
+        if demarche and o.type == "spontanee" and demarche.bloque_spontanee:
+            return self._abandonner(dossier, f"deja_en_contact : {demarche.entreprise}, {demarche.resume()}", entrees)
+        if demarche:  # une offre chez une entreprise déjà rencontrée : à regarder en premier, et toujours par toi
+            dossier.prioritaire = True
+            self.tracer(dossier, "deja_en_contact", entrees, {"demarche": demarche.resume()})
+
         violations, manquantes = violations_criteres_durs(dossier, grille)
         if violations:
             return self._abandonner(dossier, "critere_dur : " + "; ".join(violations), entrees)

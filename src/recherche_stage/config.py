@@ -128,6 +128,8 @@ class ParamsSuivi(BaseModel):
     # Tableau Excel de suivi tenu à jour (candidatures validées, envoyées, réponses).
     excel: str | None = None
     excel_feuille: str | None = None  # par défaut : la première feuille
+    # Démarches faites hors de l'outil (forum, recommandation…) : voir demarches.exemple.yaml.
+    demarches: str = "demarches.yaml"
 
 
 class ParamsPresentiel(BaseModel):
@@ -238,6 +240,8 @@ def charger(chemin: str | Path = "config.yaml") -> Config:
     base = chemin.parent
     if not Path(config.donnees).is_absolute():
         config.donnees = str(base / config.donnees)
+    if not Path(config.suivi.demarches).is_absolute():
+        config.suivi.demarches = str(base / config.suivi.demarches)
     if not Path(config.sources.dossier_imports).is_absolute():
         config.sources.dossier_imports = str(base / config.sources.dossier_imports)
     return config

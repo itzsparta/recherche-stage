@@ -1,0 +1,23 @@
+# Démarches faites en dehors de l'outil : forum, recommandation, candidature envoyée à la main.
+# Fichier personnel (noms et adresses de contacts) : il reste sur ton ordinateur, jamais versionné.
+#
+# Effets :
+# - une ligne par démarche dans le tableau Excel (rs excel ; sur une ligne existante, seules les cases vides
+#   sont remplies) ;
+# - statut envoyee, en_attente ou a_faire : jamais de candidature spontanée automatique chez cette entreprise
+#   (une offre de stage chez elle reste proposée, en tête de liste, avec la démarche rappelée) ;
+# - statut contact : rien n'est bloqué, ses offres passent en tête de liste ;
+# - relance : ce jour-là, un rappel apparaît dans rs file et dans l'interface.
+#
+# Retirer les # devant le modèle ci-dessous, le recopier pour chaque démarche, puis vérifier : rs demarches
+
+demarches:
+# - entreprise: Exemple Industrie       # nom tel qu'il apparaîtrait dans une offre (sans SAS, France…)
+#   statut: en_attente                  # envoyee | en_attente | a_faire | contact
+#   date: 2026-10-08                    # jour du contact (ou de l'envoi pour une candidature)
+#   canal: Forum                        # forum, recommandation, salon, candidature directe…
+#   contact: Prénom Nom (RH)
+#   lieu: Lille (59)                    # facultatif : limite la démarche à ce département
+#   activite: Maintenance industrielle  # facultatif : colonne Activité / Secteur de l'Excel
+#   notes: Intéressée par mon profil, me recontacte si un stage s'ouvre
+#   relance: 2026-10-20                 # facultatif : date du rappel

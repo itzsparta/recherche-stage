@@ -3,6 +3,7 @@ donnees/
 config.yaml
 profil.yaml
 preferences.yaml
+demarches.yaml
 *.db
 *.eml
 

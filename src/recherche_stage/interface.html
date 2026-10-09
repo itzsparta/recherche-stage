@@ -536,6 +536,7 @@ function creerCarte(e) {
       el("button", { onclick: () => agir(carte, { action: "page_carriere", dossier: d.id, url: adresse.value }, false) }, "Utiliser cette adresse")));
     majDepot(carte, d.depot);
   }
+  if (d.demarche) carte.append(el("div", { class: "depot" }, `Déjà en contact (${d.demarche})`));
   if (d.presentiel)
     carte.append(el("div", { class: "depot" }, `À déposer en main propre (${d.presentiel.raison})`,
       d.presentiel.adresse ? el("span", {}, " : ", el("a", { href: "https://www.openstreetmap.org/search?query=" + encodeURIComponent(d.presentiel.adresse),
