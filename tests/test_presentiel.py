@@ -132,6 +132,10 @@ def test_ordre_de_tournee_itineraires_et_excel_apres_depot():
     from recherche_stage.presentiel import itineraires, ordonner, texte_excel
 
     assert ordonner(BOULOGNE, [("loin", LAIGNEVILLE), ("inconnu", None), ("proche", DESVRES)]) == ["proche", "loin", "inconnu"]
+    # Au plus proche voisin : A, puis B (en arrière), puis C tout au bout ; décroisé : B, A, C.
+    domicile, a, b, c = (50.0, 2.0), (50.01, 2.0), (49.98, 2.0), (50.05, 2.0)
+    assert ordonner(domicile, [("A", a), ("B", b), ("C", c)]) == ["B", "A", "C"]
+    assert ordonner(None, [("A", a), ("C", c), ("B", b)]) == ["B", "A", "C"]  # sans domicile : chemin le plus court
     liens = itineraires("Calais", [f"arret {i}" for i in range(12)])
     assert len(liens) == 2 and liens[0].startswith("https://www.google.com/maps/dir/Calais/arret%200/")
     assert liens[1].startswith("https://www.google.com/maps/dir/arret%208/arret%209/")  # repart du dernier arrêt

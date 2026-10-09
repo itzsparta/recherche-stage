@@ -74,15 +74,37 @@ def point_dossier(store, dossier: Dossier) -> Point | None:
 
 
 def ordonner(depart: Point | None, arrets: list[tuple[object, Point | None]]) -> list:
-    """Tournée au plus proche voisin depuis le domicile ; les arrêts sans
-    coordonnées viennent à la fin, dans leur ordre d'origine."""
+    """Tournée au plus proche voisin depuis le domicile, raccourcie ensuite en
+    décroisant le trajet (2-opt) ; les arrêts sans coordonnées viennent à la
+    fin, dans leur ordre d'origine."""
     situes = [(a, p) for a, p in arrets if p is not None]
     ordre, ici = [], depart
     while situes:
         i = min(range(len(situes)), key=lambda k: distance_km(ici, situes[k][1])) if ici else 0
         arret, ici = situes.pop(i)
-        ordre.append(arret)
-    return ordre + [a for a, p in arrets if p is None]
+        ordre.append((arret, ici))
+    return [a for a, _ in _decroiser(depart, ordre)] + [a for a, p in arrets if p is None]
+
+
+def _decroiser(depart: Point | None, ordre: list[tuple[object, Point]]) -> list[tuple[object, Point]]:
+    """2-opt sur un trajet ouvert qui part du domicile : retourne un tronçon
+    tant que cela raccourcit le total (le plus proche voisin laisse souvent un
+    long retour en arrière)."""
+    def d(a: Point | None, b: Point | None) -> float:
+        return distance_km(a, b) if a is not None and b is not None else 0.0
+
+    n, ameliore = len(ordre), True
+    while ameliore:
+        ameliore = False
+        for i in range(n - 1):
+            avant = depart if i == 0 else ordre[i - 1][1]
+            for k in range(i + 1, n):
+                apres = ordre[k + 1][1] if k + 1 < n else None
+                gain = d(avant, ordre[i][1]) + d(ordre[k][1], apres) - d(avant, ordre[k][1]) - d(ordre[i][1], apres)
+                if gain > 1e-9:
+                    ordre[i:k + 1] = reversed(ordre[i:k + 1])
+                    ameliore = True
+    return ordre
 
 
 ARRETS_PAR_ITINERAIRE = 9  # Google Maps : 10 points au plus, départ compris

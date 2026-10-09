@@ -3,7 +3,10 @@
 Un petit serveur de la bibliothèque standard, joignable seulement depuis cet
 ordinateur (127.0.0.1), sert une page qui montre l'état du pipeline, lance un
 cycle et règle la file d'attente : relire et corriger le mail et la lettre,
-valider, rejeter, marquer un dépôt manuel. Rien ne quitte la machine.
+valider, rejeter, marquer un dépôt manuel. Rien ne quitte la machine, sauf
+dans l'onglet « Tournée » : la page affiche le Plan IGN et demande le trajet
+routier à la Géoplateforme de l'IGN (service public, sans clé ; à défaut, OSRM
+de FOSSGIS) avec les coordonnées du départ et des arrêts.
 
 Protection : chaque action exige un jeton tiré au lancement et inscrit dans la
 page, envoyé en JSON (une autre page web ouverte dans le navigateur ne peut ni
@@ -124,29 +127,44 @@ class Application:
             return ""
 
     def _tournee(self, dossiers: list[Dossier]) -> dict:
-        """Candidatures à apporter en main propre, dans l'ordre d'une tournée."""
-        prets, a_valider = [], 0
+        """Candidatures à apporter en main propre, dans l'ordre d'une tournée,
+        avec leurs coordonnées pour la carte (celles déjà connues : aucun appel réseau)."""
+        prets, en_attente, deposees = [], [], []
         for d in dossiers:
             p = d.presentiel
-            if not (p and p.conseille) or p.depose_le:
+            if not (p and p.conseille):
                 continue
-            if a_exporter(d):
+            if p.depose_le:
+                deposees.append(d)
+            elif a_exporter(d):
                 prets.append(d)
             elif d.statut == Statut.en_attente_humain:
-                a_valider += 1  # pas encore validée : rien à imprimer
+                en_attente.append(d)  # pas encore validée : rien à imprimer
+        store = self.ctx.store
+        points = {d.id: point_dossier(store, d) for d in prets + en_attente + deposees}
         domicile = self._domicile()
-        depart = point_connu(self.ctx.store, domicile) if domicile else None
-        arrets = ordonner(depart, [(d, point_dossier(self.ctx.store, d)) for d in prets])
+        depart = point_connu(store, domicile) if domicile else None
+        arrets = ordonner(depart, [(d, points[d.id]) for d in prets])
+
+        def repere(d: Dossier, etat: str) -> dict:
+            return {"id": d.id, "entreprise": d.offre.entreprise, "intitule": d.offre.intitule,
+                    "adresse": d.presentiel.adresse or d.offre.lieu, "point": points[d.id], "etat": etat,
+                    "depose_le": d.presentiel.depose_le}
+
         return {
             "domicile": domicile,
-            "a_valider": a_valider,
+            "depart": depart,
+            "a_valider": len(en_attente),
             "itineraires": itineraires(domicile, [d.presentiel.adresse or d.offre.lieu for d in arrets]),
             "arrets": [{
                 "id": d.id, "entreprise": d.offre.entreprise, "intitule": d.offre.intitule, "lieu": d.offre.lieu,
                 "adresse": d.presentiel.adresse or d.offre.lieu, "distance_km": d.presentiel.distance_km,
-                "raison": d.presentiel.raison, "lettre": d.documents.texte_lettre,
+                "raison": d.presentiel.raison, "lettre": d.documents.texte_lettre, "point": points[d.id],
                 "deja_envoyee": d.envoi.canal == "email" and d.statut != Statut.validee,
             } for d in arrets],
+            # Sur la carte seulement, hors trajet : à valider d'abord, ou déjà déposées.
+            "reperes": [repere(d, "a_valider") for d in en_attente if points[d.id]]
+                       + [repere(d, "deposee") for d in deposees if points[d.id]],
         }
 
     def _file(self) -> list[dict]:

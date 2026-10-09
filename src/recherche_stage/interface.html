@@ -57,9 +57,9 @@
   button:hover:not(:disabled), a.bouton:hover { background: var(--survol); }
   button:disabled { opacity: .5; cursor: not-allowed; }
   button svg, a.bouton svg { width: 16px; height: 16px; }
-  button.principal, .deroulant > summary.principal { background: var(--primaire); border-color: transparent; color: var(--primaire-texte);
+  button.principal, a.bouton.principal, .deroulant > summary.principal { background: var(--primaire); border-color: transparent; color: var(--primaire-texte);
                      box-shadow: 0 1px 2px color-mix(in srgb, var(--primaire) 40%, transparent); }
-  button.principal:hover:not(:disabled), .deroulant > summary.principal:hover { background: var(--primaire-survol); }
+  button.principal:hover:not(:disabled), a.bouton.principal:hover, .deroulant > summary.principal:hover { background: var(--primaire-survol); }
   button.secondaire { background: var(--secondaire); border-color: transparent; color: var(--secondaire-texte); box-shadow: none; }
   button.secondaire:hover:not(:disabled) { background: color-mix(in srgb, var(--secondaire) 80%, var(--primaire)); }
   button.fantome { background: transparent; border-color: transparent; box-shadow: none; }
@@ -354,13 +354,78 @@
   .liste button { min-height: 30px; padding: 3px 10px; font-size: 13px; white-space: nowrap; }
   .liste td .pastille + .sous { display: block; margin-top: 3px; }
 
-  /* ------------------------------------------------------------ tournée */
-  ol.arrets { list-style: none; padding: 0; margin: 0; counter-reset: arret; display: grid; gap: 14px; }
-  ol.arrets > li { counter-increment: arret; position: relative; padding-left: 48px; }
-  ol.arrets > li::before { content: counter(arret); position: absolute; z-index: 1; left: 4px; top: 18px; width: 30px; height: 30px; border-radius: 50%;
-                           background: var(--primaire); color: var(--primaire-texte); font-size: 13px; font-weight: 700; text-align: center; line-height: 30px;
-                           box-shadow: 0 0 0 4px var(--encart); }
-  ol.arrets > li:not(:last-child)::after { content: ""; position: absolute; left: 18px; top: 48px; bottom: -14px; width: 2px; background: var(--bord-fort); }
+  /* ------------------------------------------------------------ tournée : carte + feuille de route */
+  #vue-tournee { container-type: inline-size; }
+  .tournee { display: grid; gap: 16px; align-items: start; }
+  .plan-cadre { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); box-shadow: var(--ombre-carte); overflow: hidden; }
+  .plan { height: 380px; background: var(--surface); z-index: 0; }
+  /* deux colonnes : la carte reste visible pendant qu'on parcourt la liste */
+  @container (min-width: 820px) {
+    .tournee { grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr); }
+    .plan-cadre { position: sticky; top: 80px; }
+    .plan { height: max(420px, calc(100vh - 150px)); }
+  }
+  .plan-message { height: 100%; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--doux); font-size: 14px; }
+  .plan-pied { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 9px 14px; border-top: 1px solid var(--bord); font-size: 12.5px; color: var(--doux); }
+  .plan-pied #plan-etat { margin-left: auto; }
+  .legende { display: inline-flex; align-items: center; gap: 6px; }
+  .legende i { width: 10px; height: 10px; border-radius: 50%; background: var(--primaire); }
+  .legende i.maison { border-radius: 3px; background: var(--texte-menu); }
+  .legende i.a_valider { background: var(--pale); }
+  .legende i.deposee { background: var(--ok); }
+  /* Leaflet aux couleurs de la page */
+  .leaflet-container { font: inherit; font-size: 13px; background: var(--surface); }
+  .leaflet-bar a, .leaflet-bar a:hover { background: var(--carte); color: var(--texte); border-color: var(--bord); }
+  .leaflet-control-attribution { background: color-mix(in srgb, var(--carte) 85%, transparent) !important; color: var(--doux); }
+  .leaflet-control-attribution a, .leaflet-popup-content a { color: var(--accent); }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--carte); color: var(--texte); box-shadow: var(--ombre-haute); }
+  .leaflet-popup-content-wrapper { border-radius: var(--rayon-petit); }
+  .leaflet-popup-content { margin: 12px 14px; line-height: 1.45; }
+  .leaflet-popup-content b { display: block; font-size: 14px; }
+  .leaflet-tooltip { background: var(--carte); color: var(--texte); border-color: var(--bord); box-shadow: var(--ombre-carte); }
+  @media (prefers-color-scheme: dark) {
+    .plan .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.88) saturate(.55); }
+  }
+  /* le marqueur est placé par Leaflet (transform) : l'effet se fait sur la pastille intérieure */
+  .jalon-plan > span { width: 100%; height: 100%; display: grid; place-items: center; border-radius: 50%; background: var(--primaire); color: #fff;
+                       font-size: 12.5px; font-weight: 700; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(15, 23, 42, .35); transition: transform .15s, background .15s; }
+  .jalon-plan.maison > span { border-radius: 9px; background: #1e293b; }
+  .jalon-plan.maison svg { width: 16px; height: 16px; }
+  .jalon-plan.a_valider > span { background: #94a3b8; }
+  .jalon-plan.deposee > span { background: #15803d; }
+  .jalon-plan.choisi { z-index: 1000 !important; }
+  .jalon-plan.choisi > span, .jalon-plan:hover > span { transform: scale(1.2); }
+  .jalon-plan.choisi > span { background: var(--vif); }
+
+  .route { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .resume-tournee .totaux { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+  .resume-tournee .totaux b { font-size: 20px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .resume-tournee .sous { margin: 4px 0 0; }
+  .resume-tournee .actions { margin-top: 12px; }
+  .segment { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: var(--surface); border: 1px solid var(--bord); margin-top: 12px; }
+  .segment button { min-height: 28px; padding: 2px 12px; font-size: 13px; border: 0; background: none; box-shadow: none; color: var(--doux); border-radius: 7px; }
+  .segment button[aria-pressed=true] { background: var(--carte); color: var(--texte); box-shadow: var(--ombre-carte); font-weight: 600; }
+  .telephone { width: 100%; margin-top: 10px; }
+  .telephone .qr { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+  .telephone figure { margin: 0; text-align: center; font-size: 12.5px; color: var(--doux); }
+  .qr svg { display: block; width: 168px; height: 168px; border-radius: 8px; border: 1px solid var(--bord); }
+  ol.trajet { list-style: none; padding: 0; margin: 0; position: relative; }
+  ol.trajet::before { content: ""; position: absolute; left: 15px; top: 18px; bottom: 30px; width: 2px; background: var(--bord-fort); }
+  ol.trajet > li { position: relative; padding-left: 46px; }
+  .jalon { position: absolute; left: 0; top: 16px; z-index: 1; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+           background: var(--primaire); color: var(--primaire-texte); font-size: 13px; font-weight: 700; box-shadow: 0 0 0 4px var(--encart); }
+  .jalon svg { width: 16px; height: 16px; }
+  li.depart { min-height: 64px; display: flex; flex-direction: column; justify-content: center; }
+  li.depart .jalon { top: 16px; border-radius: 10px; background: var(--texte-menu); color: var(--encart); }
+  li.depart b { font-size: 14px; }
+  li.troncon { padding: 2px 0 8px 46px; font-size: 12.5px; color: var(--doux); font-variant-numeric: tabular-nums; }
+  li.troncon:empty { display: none; }
+  li.arret + li.arret { margin-top: 14px; }
+  li.arret.hors-plan .jalon { background: var(--pale); }
+  .carte.arret { padding: 16px 18px; scroll-margin: 90px; transition: border-color .15s, box-shadow .15s; }
+  .carte.arret.choisie { border-color: var(--vif); box-shadow: 0 0 0 3px color-mix(in srgb, var(--vif) 20%, transparent); }
+  .carte.arret .question { margin-top: 8px; }
+  .carte.arret > .actions { margin: 12px -18px -16px; padding: 10px 18px; }
   .aide { position: fixed; right: 20px; bottom: 84px; z-index: 25; width: 330px; max-width: calc(100% - 32px); background: var(--carte);
           border: 1px solid var(--bord); border-radius: var(--rayon); padding: 16px 18px; box-shadow: var(--ombre-haute); font-size: 14px; animation: surgir .14s ease-out; }
   .aide h3 { margin: 0 0 10px; font-size: 15px; }
@@ -490,6 +555,14 @@
     .liste td[data-titre]:empty { display: none; }
     .liste td[data-titre]::before { content: attr(data-titre) " : "; color: var(--doux); font-size: 12.5px; }
     .menu-flottant { width: min(300px, calc(100vw - 32px)); }
+    .plan { height: 340px; }
+    ol.trajet::before { left: 12px; }
+    ol.trajet > li, li.troncon { padding-left: 36px; }
+    .jalon { width: 26px; height: 26px; top: 18px; font-size: 12px; box-shadow: 0 0 0 3px var(--encart); }
+    .jalon svg { width: 14px; height: 14px; }
+    .carte.arret { padding: 14px; }
+    .carte.arret > .actions { margin: 12px -14px -14px; padding: 10px 14px; }
+    .carte.arret .entete { flex-direction: column; gap: 0; }
   }
 
   #impression { display: none; }
@@ -501,6 +574,9 @@
     #impression .feuille + .feuille { break-before: page; }
     #impression .lettre { white-space: pre-wrap; }
     #impression li { margin-bottom: 8px; }
+    #impression .qr-impression { float: right; display: flex; gap: 10px; margin: 0 0 10px 16px; font: 8pt system-ui, sans-serif; text-align: center; }
+    #impression .qr-impression figure { margin: 0; }
+    #impression .qr-impression svg { width: 3.4cm; height: 3.4cm; display: block; }
   }
   #toast { position: fixed; right: 20px; bottom: 20px; z-index: 50; transform: translateY(8px); max-width: min(440px, calc(100% - 32px));
            background: var(--carte); color: var(--texte); border: 1px solid var(--bord); padding: 12px 16px 12px 14px; border-radius: var(--rayon);
@@ -525,7 +601,7 @@
     <div class="groupe">Candidatures</div>
     <button id="onglet-file" data-vue="file" data-icone="boite"><span>À traiter</span><span class="compte" hidden></span></button>
     <button id="onglet-candidatures" data-vue="candidatures" data-icone="liste"><span>Mes candidatures</span><span class="compte" hidden></span></button>
-    <button id="onglet-tournee" data-vue="tournee" data-icone="lieu"><span>Sur place</span><span class="compte" hidden></span></button>
+    <button id="onglet-tournee" data-vue="tournee" data-icone="carte"><span>Tournée</span><span class="compte" hidden></span></button>
     <div class="groupe">Pilotage</div>
     <button id="onglet-agents" data-vue="agents" data-icone="agents"><span>Agents</span><span class="compte" hidden></span></button>
     <button id="onglet-reglages" data-vue="reglages" data-icone="reglages"><span>Réglages</span><span class="compte" hidden></span></button>
@@ -597,7 +673,25 @@
     </div>
     <div id="candidatures"></div>
   </section>
-  <section class="vue" id="vue-tournee" aria-labelledby="titre-vue" hidden><div id="tournee"></div></section>
+  <section class="vue" id="vue-tournee" aria-labelledby="titre-vue" hidden>
+    <div id="tournee-vide" hidden></div>
+    <div class="tournee" id="tournee-zone" hidden>
+      <div class="plan-cadre">
+        <div class="plan" id="plan" role="region" aria-label="Carte de la tournée"></div>
+        <div class="plan-pied">
+          <span class="legende"><i class="maison"></i>Départ</span>
+          <span class="legende"><i></i>À déposer</span>
+          <span class="legende"><i class="a_valider"></i>À valider d'abord</span>
+          <span class="legende"><i class="deposee"></i>Déjà déposée</span>
+          <span id="plan-etat" aria-live="polite"></span>
+        </div>
+      </div>
+      <div class="route">
+        <div class="panneau resume-tournee" id="tournee-resume"></div>
+        <ol class="trajet" id="tournee" aria-label="Ordre de passage"></ol>
+      </div>
+    </div>
+  </section>
   <section class="vue" id="vue-agents" aria-labelledby="titre-vue" hidden>
     <div class="panneau panneau-pipeline">
       <div class="pipeline" id="pipeline" aria-label="Les agents dans l'ordre du pipeline"></div>
@@ -687,6 +781,12 @@ const ICONES = {
   boite: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   liste: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
   lieu: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+  carte: '<path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3z"/><path d="M9 3v15M15 6v15"/>',
+  maison: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  voiture: '<path d="M5 17h14M5 17a2 2 0 1 0 4 0M15 17a2 2 0 1 0 4 0M3 17v-5l2.2-5.1A2 2 0 0 1 7 5.7h10a2 2 0 0 1 1.8 1.2L21 12v5M3 12h18"/>',
+  telephone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>',
+  imprimer: '<path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+  externe: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   agents: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h3.5a3 3 0 0 1 3 3V14"/>',
   reglages: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
   valise: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
@@ -1141,7 +1241,7 @@ const VUES = ["file", "candidatures", "tournee", "agents", "reglages"];
 const TITRES = {
   file: ["À traiter", "Relis, corrige si besoin, puis valide ou écarte."],
   candidatures: ["Mes candidatures", "Tout ce qui est validé ou parti, avec les relances prévues."],
-  tournee: ["Sur place", "Les candidatures à déposer en main propre, dans l'ordre de la tournée."],
+  tournee: ["Tournée", "Les entreprises où déposer ton CV en main propre : la carte, le trajet et l'ordre de passage."],
   agents: ["Agents", "Ce que fait chaque agent, les sources de la Veille et le bilan."],
   reglages: ["Réglages", "Préférences de rédaction et paramètres de recherche."],
 };
@@ -1157,6 +1257,7 @@ function montrerVue() {
   document.getElementById("chiffres").hidden = vue === "reglages";
   basculerMenu(false);
   if (vue === "agents") chargerAgents(true);
+  if (vue === "tournee") setTimeout(ouvrirPlan);  // après le chargement du script (tournee est déclarée plus bas)
 }
 function allerA(vue) { history.replaceState(null, "", "#" + vue); montrerVue(); }
 document.querySelectorAll(".menu button").forEach(b => b.addEventListener("click", () => allerA(b.dataset.vue)));
@@ -1246,40 +1347,308 @@ document.getElementById("recherche").addEventListener("input", () => dessinerCan
 document.getElementById("filtre").addEventListener("change", () => dessinerCandidatures());
 
 // ------------------------------------------------------------------ tournée
-let tournee = null, tourneeAffichee = "";
+// Carte : Leaflet (chargé seulement à l'ouverture de l'onglet, empreinte vérifiée) sur le Plan IGN.
+// Trajet routier : Géoplateforme de l'IGN (service public, sans clé), sinon OSRM de FOSSGIS
+// (données OpenStreetMap), sinon lignes droites. Ils reçoivent les coordonnées du départ et des
+// arrêts, comme la Base Adresse Nationale qui les a calculées ; rien d'autre ne sort.
+const BIBLIOTHEQUES = {
+  leaflet: [["leaflet@1.9.4/dist/leaflet.css", "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="],
+            ["leaflet@1.9.4/dist/leaflet.js", "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="]],
+  qr: [["qrcode-generator@1.4.4/qrcode.js", "sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k"]],
+};
+const CDN = ["https://cdn.jsdelivr.net/npm/", "https://unpkg.com/"];
+const PLAN_IGN = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2"
+  + "&STYLE=normal&TILEMATRIXSET=PM&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}";
+const MINUTES_SUR_PLACE = 10;
+const chargements = {};
+function charger(nom) {
+  const un = ([chemin, integrite], i = 0) => new Promise((ok, ko) => {
+    const css = chemin.endsWith(".css");
+    const n = el(css ? "link" : "script", { [css ? "href" : "src"]: CDN[i] + chemin, rel: css ? "stylesheet" : null,
+      integrity: integrite, crossorigin: "anonymous", referrerpolicy: "no-referrer", onload: ok,
+      onerror: () => { n.remove(); i + 1 < CDN.length ? un([chemin, integrite], i + 1).then(ok, ko) : ko(new Error(chemin)); } });
+    document.head.append(n);
+  });
+  return chargements[nom] ??= Promise.all(BIBLIOTHEQUES[nom].map(f => un(f))).catch(err => { delete chargements[nom]; throw err; });
+}
+
+const kmEntre = (a, b) => {
+  const r = Math.PI / 180, h = Math.sin((b[0] - a[0]) * r / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin((b[1] - a[1]) * r / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(h));
+};
+const km = v => `${v.toLocaleString("fr-FR", { maximumFractionDigits: v < 10 ? 1 : 0 })} km`;
+const duree = min => { min = Math.max(1, Math.round(min)); return min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}`; };
+
+// Les deux services rendent la même chose : tracé [lat, lon], tronçons {km, min}, totaux.
+async function trajetIGN(points, mode) {
+  const lonlat = p => `${p[1]},${p[0]}`;
+  const params = new URLSearchParams({ resource: "bdtopo-osrm", profile: mode === "pied" ? "pedestrian" : "car", optimization: "fastest",
+    start: lonlat(points[0]), end: lonlat(points.at(-1)), geometryFormat: "geojson", getSteps: "false", getBbox: "false",
+    distanceUnit: "kilometer", timeUnit: "minute" });
+  if (points.length > 2) params.set("intermediates", points.slice(1, -1).map(lonlat).join("|"));
+  const r = await fetch("https://data.geopf.fr/navigation/itineraire?" + params, { signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`IGN : ${r.status}`);
+  const j = await r.json();
+  const ligne = j.geometry?.coordinates;
+  if (!Array.isArray(ligne) || ligne.length < 2 || !(+j.distance > 0)) throw new Error("IGN : réponse inattendue");
+  const portions = Array.isArray(j.portions) && j.portions.length === points.length - 1 ? j.portions : null;
+  return { ligne: ligne.map(([lon, lat]) => [lat, lon]), km: +j.distance, min: +j.duration, source: "IGN Géoplateforme",
+           troncons: portions && portions.map(p => ({ km: +p.distance, min: +p.duration })) };
+}
+async function trajetOSRM(points, mode) {
+  const profil = mode === "pied" ? "routed-foot" : "routed-car";
+  const r = await fetch(`https://routing.openstreetmap.de/${profil}/route/v1/driving/${points.map(p => `${p[1]},${p[0]}`).join(";")}`
+    + "?overview=full&geometries=geojson", { signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`OSRM : ${r.status}`);
+  const route = (await r.json()).routes?.[0];
+  if (!route?.geometry?.coordinates?.length) throw new Error("OSRM : pas de trajet");
+  return { ligne: route.geometry.coordinates.map(([lon, lat]) => [lat, lon]), km: route.distance / 1000, min: route.duration / 60,
+           source: "OSRM (FOSSGIS), © OpenStreetMap", troncons: route.legs.length === points.length - 1
+             ? route.legs.map(l => ({ km: l.distance / 1000, min: l.duration / 60 })) : null };
+}
+const trajets = new Map();
+function calculerTrajet(points, mode) {
+  const cle = JSON.stringify([points, mode]);
+  if (!trajets.has(cle))
+    trajets.set(cle, trajetIGN(points, mode).catch(() => trajetOSRM(points, mode)).catch(() => { trajets.delete(cle); return null; }));
+  return trajets.get(cle);
+}
+
+let tournee = null, tourneeAffichee = "", trajet = null, choix = null;
+let modeTrajet = (() => { try { return localStorage.getItem("tournee-mode") === "pied" ? "pied" : "voiture"; } catch { return "voiture"; } })();
+// Points du trajet dans l'ordre : départ (s'il est localisé) puis les arrêts situés.
+function pointsTrajet(t) {
+  return [...(t.depart ? [t.depart] : []), ...t.arrets.filter(a => a.point).map(a => a.point)];
+}
+
 function afficherTournee(t) {
   tournee = t;
-  compteOnglet("tournee", "Sur place", t.arrets.length);
+  compteOnglet("tournee", "Tournée", t.arrets.length);
   const signature = JSON.stringify([t, cycleEnCours]);
   if (signature === tourneeAffichee) return;
   tourneeAffichee = signature;
-  const conteneur = document.getElementById("tournee");
-  const attente = t.a_valider ? el("p", { class: "sous" }, `${t.a_valider} autre(s) candidature(s) à déposer sur place attendent ta validation dans « À traiter ».`) : "";
-  if (!t.arrets.length)
-    return conteneur.replaceChildren(el("div", { class: "vide" }, "Aucune candidature à apporter en main propre pour l'instant.", attente));
-  const outils = el("div", { class: "panneau" },
-    el("div", { class: "sous" }, `Départ : ${t.domicile || "domicile non renseigné"} · ${t.arrets.length} arrêt(s), dans l'ordre le plus court à vol d'oiseau.`),
-    el("div", { class: "actions" },
-      t.itineraires.map((u, i) => el("a", { class: "bouton", href: u, target: "_blank", rel: "noreferrer" },
-        t.itineraires.length > 1 ? `Itinéraire ${i + 1}/${t.itineraires.length} ↗` : "Itinéraire ↗")),
-      el("button", { class: "principal", onclick: imprimerTournee }, "Imprimer la tournée et les lettres")),
-    attente);
-  const liste = el("ol", { class: "arrets" }, t.arrets.map(a => {
-    const carte = el("article", { class: "carte" },
-      el("div", { class: "entete" },
-        el("div", {}, el("h3", {}, a.entreprise), el("div", { class: "sous" }, a.intitule)),
-        el("div", { class: "badges" }, a.distance_km != null ? el("span", { class: "badge" }, `${Math.round(a.distance_km)} km`) : "",
-          a.deja_envoyee ? el("span", { class: "badge" }, "déjà envoyée par mail") : "")),
-      el("p", { class: "question" }, el("a", { href: "https://www.openstreetmap.org/search?query=" + encodeURIComponent(a.adresse), target: "_blank", rel: "noreferrer" }, a.adresse + " ↗"),
-        "\n", a.raison, a.lettre ? "" : "\nLettre absente : l'imprimer depuis le dossier."),
-      el("div", { class: "actions" }, el("button", { class: "principal", disabled: cycleEnCours || null, onclick: ev => deposeSurPlace(ev.target, a) }, "Déposée ✓")));
-    return el("li", {}, carte);
-  }));
-  conteneur.replaceChildren(outils, el("div", { style: "margin-top:14px" }), liste);
+  const rien = !t.arrets.length && !t.reperes.length;
+  document.getElementById("tournee-zone").hidden = rien;
+  document.getElementById("tournee-vide").hidden = !rien;
+  if (rien)
+    return document.getElementById("tournee-vide").replaceChildren(el("div", { class: "vide" },
+      "Aucune entreprise où déposer ton CV en main propre pour l'instant.", el("br"),
+      "Les candidatures spontanées chez une petite entreprise proche de chez toi apparaîtront ici, sur la carte."));
+  const points = pointsTrajet(t), cle = JSON.stringify([points, modeTrajet]);
+  if (trajet?.cle !== cle) trajet = { cle, points, mode: modeTrajet, resultat: null };
+  dessinerResume(t);
+  dessinerArrets(t);
+  if (!document.getElementById("vue-tournee").hidden) ouvrirPlan();
 }
+
+function dessinerResume(t) {
+  const n = t.arrets.length;
+  const r = trajet.resultat;
+  const total = r ? `${km(r.km)} · ${duree(r.min)}` : "";
+  const attente = t.a_valider ? el("p", { class: "sous" }, `${t.a_valider} autre(s) entreprise(s) à visiter attendent ta validation dans « À traiter » (en gris sur la carte).`) : "";
+  const telephone = t.itineraires.length ? el("details", { class: "telephone" }, el("summary", {}, "Sur ton téléphone (QR code)"),
+    el("div", { class: "qr", id: "qr-tournee" }, el("span", { class: "sous" }, "Chargement…"))) : "";
+  if (telephone) telephone.addEventListener("toggle", () => telephone.open && dessinerQR());
+  const segment = el("div", { class: "segment", role: "group", "aria-label": "Mode de déplacement" },
+    [["voiture", "En voiture"], ["pied", "À pied"]].map(([mode, libelle]) =>
+      el("button", { type: "button", "aria-pressed": String(modeTrajet === mode), onclick: () => changerMode(mode) }, libelle)));
+  document.getElementById("tournee-resume").replaceChildren(
+    el("div", { class: "totaux" }, el("b", {}, n ? `${n} arrêt${n > 1 ? "s" : ""}` : "Aucun arrêt prêt"),
+      el("span", { class: "sous", id: "tournee-total" }, n ? total || (trajet.points.length > 1 ? "trajet en calcul…" : "") : "")),
+    el("p", { class: "sous", id: "tournee-prevision" }, prevision(t, r)),
+    n ? segment : "",
+    n ? el("div", { class: "actions" },
+      t.itineraires.map((u, i) => el("a", { class: "bouton principal", href: u, target: "_blank", rel: "noreferrer" }, icone("externe"),
+        t.itineraires.length > 1 ? `Google Maps ${i + 1}/${t.itineraires.length}` : "Ouvrir dans Google Maps")),
+      el("button", { onclick: imprimerTournee }, icone("imprimer"), "Imprimer la tournée et les lettres")) : "",
+    n ? telephone : "",
+    attente);
+}
+function prevision(t, r) {
+  if (!t.arrets.length) return "Valide d'abord les candidatures à déposer : elles rejoindront la tournée.";
+  const depart = t.depart ? `Départ : ${t.domicile}.` : `Départ non localisé (${t.domicile || "domicile vide"}) : renseigne « Point de départ » dans Réglages.`;
+  if (!r) return depart;
+  return `${depart} Compte environ ${duree(r.min + MINUTES_SUR_PLACE * t.arrets.filter(a => a.point).length)} avec ${MINUTES_SUR_PLACE} min sur place par entreprise.`;
+}
+
+function dessinerArrets(t) {
+  const items = [];
+  if (t.arrets.length)
+    items.push(el("li", { class: "depart" }, el("span", { class: "jalon", "aria-hidden": "true" }, icone("maison")),
+      el("b", {}, "Départ"), el("span", { class: "sous" }, t.domicile || "domicile non renseigné")));
+  let etape = 0;
+  t.arrets.forEach((a, i) => {
+    // Tronçon depuis le point précédent : rempli à vol d'oiseau, puis par la route quand le trajet arrive.
+    items.push(el("li", { class: "troncon", "data-etape": a.point && (t.depart || etape) ? String(t.depart ? etape : etape - 1) : null }));
+    if (a.point) etape++;
+    items.push(el("li", { class: "arret" + (a.point ? "" : " hors-plan"), "data-id": a.id },
+      el("span", { class: "jalon", "aria-hidden": "true" }, String(i + 1)),
+      el("article", { class: "carte arret" + (choix === a.id ? " choisie" : "") },
+        el("div", { class: "entete" },
+          el("div", {}, el("h3", {}, a.entreprise), el("div", { class: "sous" }, a.intitule)),
+          el("div", { class: "badges" }, a.distance_km != null ? el("span", { class: "badge" }, `${Math.round(a.distance_km)} km de chez toi`) : "",
+            a.deja_envoyee ? el("span", { class: "badge" }, "déjà envoyée par mail") : "")),
+        el("p", { class: "question" }, a.adresse, "\n", a.raison,
+          a.point ? "" : "\nPosition inconnue : pas sur la carte, à placer toi-même dans le trajet.",
+          a.lettre ? "" : "\nLettre absente : l'imprimer depuis le dossier."),
+        el("div", { class: "actions" },
+          a.point ? el("button", { class: "fantome petit", onclick: () => choisir(a.id, true) }, icone("lieu"), "Sur la carte") : "",
+          el("button", { class: "principal petit", disabled: cycleEnCours || null, onclick: ev => deposeSurPlace(ev.currentTarget, a) }, icone("ok"), "Déposée")))));
+  });
+  document.getElementById("tournee").replaceChildren(...items);
+  remplirTroncons();
+}
+// Distances entre arrêts : par la route si le trajet est calculé, sinon à vol d'oiseau.
+function remplirTroncons() {
+  const { points, resultat } = trajet;
+  document.querySelectorAll("#tournee li.troncon[data-etape]").forEach(li => {
+    const i = +li.dataset.etape, route = resultat?.troncons?.[i];
+    if (!points[i + 1]) return;
+    li.textContent = route ? `${km(route.km)} · ${duree(route.min)} ${modeTrajet === "pied" ? "à pied" : "en voiture"}`
+                           : `≈ ${km(kmEntre(points[i], points[i + 1]))} à vol d'oiseau`;
+  });
+}
+function changerMode(mode) {
+  if (mode === modeTrajet) return;
+  modeTrajet = mode;
+  try { localStorage.setItem("tournee-mode", mode); } catch {}
+  tourneeAffichee = "";
+  afficherTournee(tournee);
+}
+
+// ------------------------------------------------------------- la carte
+let plan = null, couches = null, reperesPlan = new Map(), cadrage = "";
+async function ouvrirPlan() {
+  if (!tournee || document.getElementById("tournee-zone").hidden) return;
+  if (await preparerPlan()) dessinerPlan(tournee);
+  tracerTrajet(tournee);  // les distances de la liste, même sans carte
+}
+async function preparerPlan() {
+  const zone = document.getElementById("plan");
+  if (!plan) {
+    try { await charger("leaflet"); }
+    catch {
+      zone.replaceChildren(el("div", { class: "plan-message" }, "Carte indisponible : la bibliothèque n'a pas pu être chargée (pas de connexion ?). La liste reste à jour."));
+      return false;
+    }
+    if (plan) return true;  // créée entre-temps par un autre appel
+    zone.replaceChildren();
+    plan = L.map(zone, { zoomSnap: 0.5 }).setView([49.9, 2.6], 8);
+    const tuiles = L.tileLayer(PLAN_IGN, { maxZoom: 18, attribution: '<a href="https://www.ign.fr/" target="_blank" rel="noreferrer">© IGN</a> Plan IGN' }).addTo(plan);
+    let erreurs = 0;
+    tuiles.on("tileerror", () => { if (++erreurs === 4) etatPlan("Fond de carte indisponible (pas de connexion ?)."); });
+    tuiles.on("tileload", () => { erreurs = 0; });
+    couches = { trajet: L.layerGroup().addTo(plan), reperes: L.layerGroup().addTo(plan) };
+  }
+  plan.invalidateSize();
+  return true;
+}
+function etatPlan(texte) { document.getElementById("plan-etat").textContent = texte; }
+
+function jalonPlan(contenu, classe, taille = 30) {
+  return L.divIcon({ className: "jalon-plan " + classe, html: el("span", {}, contenu), iconSize: [taille, taille],
+                     iconAnchor: [taille / 2, taille / 2], popupAnchor: [0, -taille / 2] });
+}
+function bulle(titre, ...lignes) { return el("div", {}, el("b", {}, titre), lignes.filter(Boolean).map(l => el("div", { class: "sous" }, l))); }
+
+function dessinerPlan(t) {
+  couches.reperes.clearLayers();
+  reperesPlan = new Map();
+  const tous = [];
+  if (t.depart) {
+    const m = L.marker(t.depart, { icon: jalonPlan(icone("maison"), "maison", 32), zIndexOffset: 500, keyboard: false })
+      .bindPopup(bulle("Départ", t.domicile));
+    couches.reperes.addLayer(m); tous.push(t.depart);
+  }
+  for (const r of t.reperes) {
+    const m = L.marker(r.point, { icon: jalonPlan(r.etat === "deposee" ? "✓" : "?", r.etat, 24), title: r.entreprise })
+      .bindPopup(bulle(r.entreprise, r.intitule, r.adresse, r.etat === "deposee" ? `Déposée le ${dateCourte(r.depose_le)}` : "À valider d'abord dans « À traiter »"));
+    couches.reperes.addLayer(m); tous.push(r.point);
+  }
+  t.arrets.forEach((a, i) => {
+    if (!a.point) return;
+    const m = L.marker(a.point, { icon: jalonPlan(String(i + 1), choix === a.id ? "choisi" : ""), title: `${i + 1}. ${a.entreprise}`, zIndexOffset: 1000 })
+      .bindPopup(bulle(`${i + 1}. ${a.entreprise}`, a.intitule, a.adresse));
+    m.on("click", () => choisir(a.id, false));
+    couches.reperes.addLayer(m); reperesPlan.set(a.id, m); tous.push(a.point);
+  });
+  // Recadre seulement quand les lieux changent (pas à chaque rafraîchissement).
+  const cle = JSON.stringify(tous);
+  if (cle !== cadrage && tous.length) {
+    cadrage = cle;
+    tous.length === 1 ? plan.setView(tous[0], 13) : plan.fitBounds(tous, { padding: [36, 36], maxZoom: 14 });
+  }
+}
+
+async function tracerTrajet(t) {
+  const demande = trajet, couleur = getComputedStyle(document.documentElement).getPropertyValue("--vif").trim() || "#4169e1";
+  couches?.trajet.clearLayers();
+  etatPlan("");
+  if (demande.points.length < 2) return;
+  // En attendant la route (ou faute de route) : lignes droites en pointillé.
+  if (couches) L.polyline(demande.points, { color: couleur, weight: 3, opacity: .7, dashArray: "6 8" }).addTo(couches.trajet);
+  if (!demande.resultat) etatPlan("Calcul du trajet…");
+  const r = demande.resultat || await calculerTrajet(demande.points, demande.mode);
+  if (demande !== trajet) return;  // la tournée a changé entre-temps
+  if (!r) return etatPlan("Trajet routier indisponible : lignes droites entre les arrêts.");
+  demande.resultat = r;
+  if (couches) {
+    couches.trajet.clearLayers();
+    L.polyline(r.ligne, { color: "#fff", weight: 8, opacity: .85, interactive: false }).addTo(couches.trajet);
+    L.polyline(r.ligne, { color: couleur, weight: 5, opacity: .95, interactive: false }).addTo(couches.trajet);
+  }
+  etatPlan(`Trajet : ${r.source}`);
+  document.getElementById("tournee-total").textContent = `${km(r.km)} · ${duree(r.min)} ${demande.mode === "pied" ? "à pied" : "de route"}`;
+  document.getElementById("tournee-prevision").textContent = prevision(t, r);
+  remplirTroncons();
+}
+
+// Arrêt choisi : surligné dans la liste et sur la carte.
+function choisir(id, versPlan) {
+  choix = id;
+  document.querySelectorAll("#tournee .carte.arret").forEach(c => c.classList.toggle("choisie", c.closest("li").dataset.id === id));
+  reperesPlan.forEach((m, cle) => m.getElement()?.classList.toggle("choisi", cle === id));
+  const m = reperesPlan.get(id);
+  if (versPlan && m) {
+    document.getElementById("plan").scrollIntoView({ block: "nearest", behavior: "smooth" });
+    plan.flyTo(m.getLatLng(), Math.max(plan.getZoom(), 14), { duration: .6 });
+    m.openPopup();
+  } else {
+    document.querySelector(`#tournee li[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
+// QR codes des liens Google Maps : le téléphone ouvre l'itinéraire, arrêts dans l'ordre.
+function qrSvg(texte) {
+  const qr = qrcode(0, "L");
+  qr.addData(texte); qr.make();
+  const n = qr.getModuleCount(), marge = 3, cote = n + 2 * marge;
+  let d = "";
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (qr.isDark(y, x)) d += `M${x + marge} ${y + marge}h1v1h-1z`;
+  const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${cote} ${cote}`); svg.setAttribute("shape-rendering", "crispEdges");
+  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "QR code de l'itinéraire");
+  const fond = document.createElementNS(NS, "rect"), motif = document.createElementNS(NS, "path");
+  fond.setAttribute("width", cote); fond.setAttribute("height", cote); fond.setAttribute("fill", "#fff");
+  motif.setAttribute("d", d); motif.setAttribute("fill", "#000");
+  svg.append(fond, motif);
+  return svg;
+}
+function figuresQR(liens) {
+  return liens.map((u, i) => el("figure", {}, qrSvg(u), el("figcaption", {}, liens.length > 1 ? `Partie ${i + 1}/${liens.length}` : "Google Maps, arrêts dans l'ordre")));
+}
+async function dessinerQR() {
+  const zone = document.getElementById("qr-tournee");
+  try {
+    await charger("qr");
+    zone.replaceChildren(...figuresQR(tournee.itineraires),
+      el("p", { class: "sous" }, "Vise-le avec l'appareil photo du téléphone : Google Maps s'ouvre avec le trajet, prêt pour la navigation."));
+  } catch { zone.replaceChildren(el("span", { class: "sous" }, "QR code indisponible (pas de connexion ?) : ouvre le lien Google Maps et envoie-le-toi.")); }
+}
+
 async function deposeSurPlace(bouton, a) {
   if (bouton.dataset.confirme !== "1") {
-    bouton.dataset.confirme = "1"; bouton.textContent = `Confirmer : déposée chez ${a.entreprise}`;
+    bouton.dataset.confirme = "1"; bouton.lastChild.textContent = `Confirmer : déposée chez ${a.entreprise}`;
     return;
   }
   bouton.disabled = true;
@@ -1287,14 +1656,24 @@ async function deposeSurPlace(bouton, a) {
   catch (err) { toast(err.message, true); }
   await rafraichir();
 }
-function imprimerTournee() {
-  const t = tournee;
+async function imprimerTournee() {
+  const t = tournee, r = trajet.resultat;
+  try { await charger("qr"); } catch {}  // sans QR code si la bibliothèque manque
   const aujourdhui = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  let etape = 0;
+  const lignes = t.arrets.map(a => {
+    const i = t.depart ? etape : etape - 1, route = a.point && i >= 0 ? r?.troncons?.[i] : null;
+    if (a.point) etape++;
+    return el("li", {}, "☐ ", el("b", {}, a.entreprise), ` — ${a.adresse}`,
+      route ? ` (${km(route.km)} · ${duree(route.min)} depuis ${i === 0 && t.depart ? "le départ" : "l'arrêt précédent"})` : a.distance_km != null ? ` (${Math.round(a.distance_km)} km de chez toi)` : "",
+      el("br"), a.intitule, a.lettre ? "" : " · lettre à imprimer depuis le dossier");
+  });
   const feuilles = [el("section", { class: "feuille" },
+    window.qrcode ? el("div", { class: "qr-impression" }, figuresQR(t.itineraires)) : "",
     el("h1", {}, `Tournée du ${aujourdhui}`),
-    el("p", {}, `Départ : ${t.domicile || "—"}. À emporter : ${t.arrets.length} CV imprimé(s) et les lettres qui suivent, chacune signée.`),
-    el("ol", {}, t.arrets.map(a => el("li", {}, "☐ ", el("b", {}, a.entreprise), ` — ${a.adresse}`,
-      a.distance_km != null ? ` (${Math.round(a.distance_km)} km)` : "", el("br"), a.intitule, a.lettre ? "" : " · lettre à imprimer depuis le dossier"))))];
+    el("p", {}, `Départ : ${t.domicile || "—"}. À emporter : ${t.arrets.length} CV imprimé(s) et les lettres qui suivent, chacune signée.`,
+      r ? ` Trajet : ${km(r.km)}, ${duree(r.min)} ${modeTrajet === "pied" ? "à pied" : "de route"}.` : ""),
+    el("ol", {}, lignes))];
   for (const a of t.arrets) if (a.lettre) feuilles.push(el("section", { class: "feuille" }, el("div", { class: "lettre" }, a.lettre)));
   document.getElementById("impression").replaceChildren(...feuilles);
   window.print();

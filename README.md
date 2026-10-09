@@ -125,11 +125,16 @@ rs profil --cv cv.pdf --releves releve_S1.pdf releve_S2.pdf
 rs cycle                                  # veille → scoring → enquête → rédaction → critique → brouillon
 rs interface                              # tout dans le navigateur (sous Windows : double-clic sur interface.bat) :
                                           # lancer un cycle, relire et corriger mail et lettre, valider, rejeter,
-                                          # dépôts à la main. Serveur local (127.0.0.1) : rien ne quitte la machine
+                                          # dépôts à la main. Serveur local (127.0.0.1) : rien ne quitte la machine,
+                                          # sauf, dans l'onglet « Tournée », les coordonnées du départ et des arrêts
+                                          # envoyées au calcul de trajet de l'IGN (service public, sans clé)
                                           # Onglets : « À traiter » (avec la raison du score) ; « Mes candidatures »
                                           # (statut, relance prévue, réponse entretien/refus à saisir) ;
-                                          # « Sur place » (tournée ordonnée, itinéraire, impression des lettres,
-                                          # « Déposée ✓ », qui vaut envoi). Motifs de rejet repris dans `rs bilan`
+                                          # « Tournée » : carte des entreprises où déposer ton CV en main propre
+                                          # (Plan IGN), trajet par la route dans l'ordre le plus court, distance et
+                                          # durée de chaque tronçon (voiture ou à pied), lien Google Maps et QR code
+                                          # pour le téléphone, impression de la tournée et des lettres, « Déposée »
+                                          # (qui vaut envoi). Motifs de rejet repris dans `rs bilan`
                                           # Avant un cycle : vérification (session Claude, Excel ouvert, ports mail),
                                           # avancement par étapes, notification à la fin. Comparaison avec la
                                           # version précédente, lettre en PDF, filtres, raccourcis clavier (« ? »).

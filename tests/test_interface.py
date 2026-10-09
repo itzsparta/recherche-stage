@@ -162,12 +162,15 @@ def test_tournee_sur_place(app, ctx):
         d.offre.latitude, d.offre.longitude = point
         d.presentiel = Presentiel(conseille=True, distance_km=km, raison=f"à {km} km", adresse=f"1 rue {d.offre.entreprise}")
         ctx.store.save(d)
-    assert app.etat()["tournee"]["arrets"] == [] and app.etat()["tournee"]["a_valider"] == 2  # rien de validé
+    t = app.etat()["tournee"]
+    assert t["arrets"] == [] and t["a_valider"] == 2  # rien de validé
+    assert t["depart"] == (50.7264, 1.6147) and {r["etat"] for r in t["reperes"]} == {"a_valider"}  # sur la carte, hors trajet
 
     app.action({"action": "valider", "dossier": proche.id})  # mail validé, pas encore parti
     app.action({"action": "valider", "dossier": loin.id})  # sans adresse : à déposer
     t = app.etat()["tournee"]
     assert [a["entreprise"] for a in t["arrets"]] == ["Exemple Énergie", "Sans Adresse"]
+    assert t["arrets"][0]["point"] == (50.667, 1.833) and t["reperes"] == []
     assert t["itineraires"][0].startswith("https://www.google.com/maps/dir/Boulogne-sur-Mer/1%20rue%20Exemple")
 
     # Déposée en main propre : vaut envoi, le mail validé ne partira plus.
@@ -178,6 +181,7 @@ def test_tournee_sur_place(app, ctx):
     with pytest.raises(Refus, match="déjà marquée"):
         app.action({"action": "sur_place", "dossier": proche.id})
 
+    assert [(r["entreprise"], r["etat"]) for r in app.etat()["tournee"]["reperes"]] == [("Exemple Énergie", "deposee")]
     app.action({"action": "sur_place", "dossier": loin.id})
     assert par_entreprise(ctx, "Sans Adresse").statut == Statut.envoyee
     etat = app.etat()

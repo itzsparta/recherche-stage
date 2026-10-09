@@ -105,8 +105,9 @@ suivi:
   # excel_feuille: Candidatures      # par défaut : la première feuille
 
 # Candidatures spontanées à déposer en main propre : petite entreprise proche de chez toi.
-# Signalées dans l'interface et dans le tableau Excel (colonne « Dépôt en présentiel »,
-# ajoutée si elle manque, cellule en vert avec la distance et l'adresse de l'établissement).
+# Signalées dans l'interface (onglet « Tournée » : carte, trajet, QR code pour le téléphone)
+# et dans le tableau Excel (colonne « Dépôt en présentiel », ajoutée si elle manque,
+# cellule en vert avec la distance et l'adresse de l'établissement).
 presentiel:
   actif: true
   # domicile: "Lille"             # par défaut : la ville de ton CV
