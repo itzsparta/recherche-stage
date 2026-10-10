@@ -171,11 +171,15 @@ def cmd_demarches(args) -> None:
     if not demarches:
         sys.exit(f"Aucune démarche : {chemin} absent ou vide (modèle : rs init)")
     effets = {"envoyee": "pas de spontanée en double", "en_attente": "pas de spontanée en double",
-              "a_faire": "pas de spontanée en double", "contact": "offres et spontanées prioritaires"}
+              "a_faire": "rappel « à faire » dans la file ; pas de spontanée en double",
+              "contact": "offres et spontanées prioritaires"}
     print(f"{len(demarches)} démarche(s) lues dans {chemin} :")
     for dm in demarches:
         relance = f" ; rappel le {dm.relance:%d/%m/%Y}" if dm.relance else ""
-        print(f"- {dm.entreprise} [{dm.statut}] {dm.resume()}\n    → {effets[dm.statut]}{relance}")
+        effet = effets[dm.statut]
+        if dm.depot_a_preparer:
+            effet = f"candidature préparée pour {dm.adresse or 'son site le plus proche'}, à déposer sur place (onglet Tournée)"
+        print(f"- {dm.entreprise} [{dm.statut}] {dm.resume()}\n    → {effet}{relance}")
     dossiers = [d for d in ctx.store.lister() if correspondance(demarches, d.offre.entreprise, d.offre.lieu)]
     if dossiers:
         print("Dossiers de l'outil concernés : " + ", ".join(f"{d.offre.entreprise} ({d.statut.value})" for d in dossiers))

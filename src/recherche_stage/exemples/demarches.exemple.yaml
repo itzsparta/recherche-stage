@@ -7,7 +7,11 @@
 # - statut envoyee, en_attente ou a_faire : jamais de candidature spontanée automatique chez cette entreprise
 #   (une offre de stage chez elle reste proposée, en tête de liste, avec la démarche rappelée) ;
 # - statut contact : rien n'est bloqué, ses offres passent en tête de liste ;
-# - relance : ce jour-là, un rappel apparaît dans rs file et dans l'interface.
+# - statut a_faire : un rappel « À faire » apparaît une fois dans la file ;
+# - relance : ce jour-là, un rappel apparaît dans rs file et dans l'interface ;
+# - sur_place: true (avec a_faire) : « se présenter directement sur un site ». La candidature est préparée pour
+#   le site le plus proche (annuaire des entreprises, ou l'adresse indiquée), ne part jamais par mail et rejoint
+#   l'onglet Tournée.
 #
 # Retirer les # devant le modèle ci-dessous, le recopier pour chaque démarche, puis vérifier : rs demarches
 
@@ -21,3 +25,5 @@ demarches:
 #   activite: Maintenance industrielle  # facultatif : colonne Activité / Secteur de l'Excel
 #   notes: Intéressée par mon profil, me recontacte si un stage s'ouvre
 #   relance: 2026-10-20                 # facultatif : date du rappel
+#   sur_place: true                     # facultatif : se présenter sur un site (statut a_faire)
+#   adresse: 12 rue du Port, 59140 Dunkerque  # facultatif avec sur_place : le site visé (sinon le plus proche)

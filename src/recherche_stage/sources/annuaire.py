@@ -38,6 +38,43 @@ def _nombre(valeur) -> float | None:
         return None
 
 
+def intitule_spontanee(grille: GrilleCriteres) -> str:
+    type_stage = (grille.type_stage or "").strip()
+    if type_stage.lower().startswith("stage"):
+        type_stage = type_stage[5:].strip()
+    return f"Stage {type_stage}".strip()
+
+
+def sites(http: Http, nom: str, departements: list[str]) -> list[dict]:
+    """Établissements en activité des sociétés trouvées pour ce nom (« STEF » :
+    STEF Transport Lille, STEF Logistique Arras…), dans ces départements. Le
+    tri des sociétés qui portent vraiment ce nom est laissé à l'appelant."""
+    trouves, vus = [], set()
+    for departement in departements or [None]:
+        params: dict = {"q": nom, "per_page": PAR_PAGE, "etat_administratif": "A"}
+        if departement:
+            params["departement"] = departement
+        for r in (http.get_json(URL, params=params) or {}).get("results", []):
+            for e in r.get("matching_etablissements") or [r.get("siege") or {}]:
+                siret, code_postal = e.get("siret"), str(e.get("code_postal") or "")
+                if siret in vus or e.get("etat_administratif", "A") != "A":
+                    continue
+                if departement and not code_postal.startswith(departement):
+                    continue
+                vus.add(siret)
+                trouves.append({
+                    "entreprise": r.get("nom_complet") or r.get("nom_raison_sociale", ""),
+                    "siren": str(r.get("siren", "")),
+                    "lieu": f"{e.get('libelle_commune', '')} ({code_postal})" if code_postal else e.get("libelle_commune", ""),
+                    "adresse": e.get("adresse") or "",
+                    "latitude": _nombre(e.get("latitude")),
+                    "longitude": _nombre(e.get("longitude")),
+                    "activite": r.get("activite_principale"),
+                    "tranche_effectif": r.get("tranche_effectif_salarie"),
+                })
+    return trouves
+
+
 def _etablissement(r: dict, departement: str | None) -> dict:
     """L'établissement du département cherché plutôt que le siège : l'agence
     lilloise d'un groupe parisien est bien dans la zone."""
@@ -94,10 +131,7 @@ class SourceAnnuaire:
     def collecter(self, grille: GrilleCriteres, limite: int) -> list[Offre]:
         if self.max_par_cycle:
             limite = min(limite, self.max_par_cycle)
-        type_stage = (grille.type_stage or "").strip()
-        if type_stage.lower().startswith("stage"):
-            type_stage = type_stage[5:].strip()
-        intitule = f"Stage {type_stage}".strip()
+        intitule = intitule_spontanee(grille)
 
         couples = [(n, d) for n in self.codes_naf or [None] for d in self.departements or [None]]
         curseurs: dict = self._memoire("annuaire_curseurs", {}) or {}

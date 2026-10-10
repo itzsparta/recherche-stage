@@ -220,7 +220,21 @@ Pour chaque démarche : entreprise, statut (`envoyee`, `en_attente`, `a_faire` o
   automatique chez cette entreprise. Une offre de stage chez elle reste proposée,
   en tête de liste, et sa carte rappelle la démarche.
 - Statut `contact` (stand visité) : rien n'est bloqué, ses offres passent en tête.
+- Statut `a_faire` : un rappel « À faire » apparaît une fois dans la file. Quand
+  la note parle de suivre leurs offres, il indique comment les faire arriver ici
+  (`rs detecter-ats`).
 - À la date de relance, un rappel apparaît dans `rs file` et dans l'interface.
+- `sur_place: true` (avec `a_faire`), pour une entreprise qui demande de se
+  présenter directement (« plusieurs sites, venez déposer votre CV ») :
+  - **Site** : le plus proche du domicile est cherché dans l'annuaire des
+    entreprises, parmi les sociétés qui portent ce nom, dans les départements de
+    `annuaire_departements` (ou celui de `lieu`). On peut aussi l'indiquer avec
+    `adresse:`. Le rappel nomme le site retenu et les autres sites trouvés.
+  - **Candidature** : elle est préparée pour ce site, en priorité et quel que
+    soit son score ou la taille de l'entreprise.
+  - **Envoi** : elle ne part jamais par mail. Une fois validée, elle est dans
+    l'onglet « Tournée ».
+  - **Une seule fois** par démarche.
 
 `rs demarches` affiche ce qui a été compris. Le fichier reste sur ton ordinateur
 (exclu de git) : il contient des noms et des adresses de contacts.

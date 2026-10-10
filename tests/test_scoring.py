@@ -23,6 +23,9 @@ def test_criteres_durs_eliminatoires():
     assert violations_criteres_durs(dossier(dates=Periode(debut=date(2027, 1, 4), fin=date(2027, 6, 25))), g)[0]
     assert violations_criteres_durs(dossier(intitule="Stage commercial maintenance"), g)[0]
     assert violations_criteres_durs(dossier(duree_mois=6, dates=Periode()), g)[0]
+    g.durs.entreprises_exclues = ["ArcelorMittal"]  # ne prend pas de stagiaires : toutes ses sociétés
+    assert violations_criteres_durs(dossier(entreprise="ARCELORMITTAL FRANCE SAS"), g)[0] == ["entreprise exclue"]
+    assert violations_criteres_durs(dossier(entreprise="Mittal Logistique"), g)[0] == []
 
 
 def test_departement_reconnu_par_code_postal():

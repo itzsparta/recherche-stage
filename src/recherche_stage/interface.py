@@ -288,6 +288,8 @@ class Application:
         if d is None:
             return ["fermer"]
         if d.etape_attente == "depot":
+            if d.envoi.canal == "main_propre":  # se présenter sur place : ni robot ni page carrières
+                return ["deposer", "rejeter", "ouvrir"]
             return ["remplir", "deposer", "rejeter", "ouvrir", "page_carriere"]
         if d.etape_attente in VALIDABLES or d.etape_attente.startswith("relance:"):
             if d.documents.version and d.etape_attente in ("critique", "envoi"):
@@ -354,6 +356,10 @@ class Application:
                 return "Adresse enregistrée : « Remplir pour moi » l'utilisera."
             if nom == "deposer":
                 preuve = str(donnees.get("preuve", "")).strip() or "déposé (interface)"
+                p = dossier.presentiel
+                if preuve.startswith("en main propre") and p and p.conseille and not p.depose_le:
+                    self.orch.deposer_sur_place(dossier.id)  # aussi coché dans la tournée
+                    return f"{dossier.offre.entreprise} : dépôt en main propre enregistré."
                 self.orch.marquer_envoye(dossier.id, preuve)
                 return "Dépôt enregistré : le suivi et les relances démarrent."
             if nom == "ouvrir":

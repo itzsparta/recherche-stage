@@ -133,6 +133,10 @@ def effectif_min(dossier: Dossier) -> int | None:
 def evaluer(dossier: Dossier, domicile: Point | None, entreprise: Point | None, params: ParamsPresentiel) -> Presentiel:
     o = dossier.offre
     adresse = o.adresse or o.lieu
+    if o.source == "demarche":  # « se présenter sur place » : demandé par l'entreprise, quelle que soit sa taille
+        km = round(distance_km(domicile, entreprise), 1) if domicile and entreprise else None
+        return Presentiel(conseille=True, distance_km=km, adresse=adresse,
+                          raison="se présenter sur place, d'après ta démarche" + (f", à {km:.0f} km" if km is not None else ""))
     if o.type != "spontanee":
         return Presentiel(raison="offre publiée : la candidature passe par le canal indiqué", adresse=adresse)
     effectif = effectif_min(dossier)

@@ -31,6 +31,8 @@ class AgentEnvoi(Agent):
     # ------------------------------------------------------------- décisions
 
     def choisir_canal(self, dossier: Dossier) -> tuple[str, str]:
+        if dossier.offre.source == "demarche":  # « se présenter sur place » : jamais par mail, même si l'Enquête en trouve un
+            return "main_propre", dossier.offre.adresse or dossier.offre.lieu
         contact = dossier.offre.contact_email or dossier.fiche_entreprise.contact
         if contact:
             return "email", contact
@@ -95,7 +97,9 @@ class AgentEnvoi(Agent):
             dossier.etape_attente = "depot"
             dossier.motif = "depot_manuel"
             ou = f"({canal}) : {destinataire}"
-            if dossier.offre.type == "spontanee":
+            if canal == "main_propre":
+                ou = f"en main propre chez {dossier.offre.entreprise} ({destinataire}) : elle est dans l'onglet Tournée"
+            elif dossier.offre.type == "spontanee":
                 ou = (f"chez {dossier.offre.entreprise} : aucune adresse publique trouvée, passer par le "
                       f"formulaire de contact ou l'adresse RH de son site (fiche : {destinataire})")
             self.escalader(
@@ -109,7 +113,9 @@ class AgentEnvoi(Agent):
             dossier.etape_attente = "envoi"
             dossier.motif = "validation_envoi"
             ou = f"{canal} → {destinataire}"
-            if canal != "email" and dossier.offre.type == "spontanee":
+            if canal == "main_propre":
+                ou = f"à déposer en main propre : {destinataire}"
+            elif canal != "email" and dossier.offre.type == "spontanee":
                 ou = f"aucune adresse publique trouvée : passer par le site de l'entreprise ; fiche : {destinataire}"
             self.escalader(
                 dossier,

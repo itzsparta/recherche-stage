@@ -163,18 +163,28 @@ class Revue:
 
     def _depot(self, dossier: Dossier) -> bool:
         fichiers = self.ctx.dossier_fichiers(dossier.id)
-        recherche = f"https://duckduckgo.com/?q={quote_plus(dossier.offre.entreprise + ' recrutement stage candidature')}"
-        self.afficher(
-            f"Dépôt à la main chez {dossier.offre.entreprise} : CV et lettre PDF dans {fichiers}\n"
-            f"Trouver la page carrières ou le formulaire de contact : {recherche}"
-        )
+        sur_place = dossier.envoi.canal == "main_propre"
+        recherche = "" if sur_place else (
+            f"https://duckduckgo.com/?q={quote_plus(dossier.offre.entreprise + ' recrutement stage candidature')}")
+        if sur_place:
+            self.afficher(f"À apporter en main propre chez {dossier.offre.entreprise} : {dossier.envoi.destinataire}\n"
+                          f"CV et lettre PDF dans {fichiers} (trajet et feuille de route : rs interface, onglet Tournée)")
+        else:
+            self.afficher(
+                f"Dépôt à la main chez {dossier.offre.entreprise} : CV et lettre PDF dans {fichiers}\n"
+                f"Trouver la page carrières ou le formulaire de contact : {recherche}"
+            )
         while True:
             r = self._choix("[o]uvrir dossier et recherche  [d]éposé  [r]ejeter  [s]auter (plus tard)  [q]uitter : ", "odrsq")
             if r == "o":
                 self.ouvrir(str(fichiers))
-                self.ouvrir(recherche)
+                if recherche:
+                    self.ouvrir(recherche)
                 continue
-            if r == "d":
+            if r == "d" and sur_place:
+                self.orch.deposer_sur_place(dossier.id)  # aussi cochée dans la tournée
+                self.bilan["deposees"] += 1
+            elif r == "d":
                 preuve = self.demander("Où et quand (ex. « site carrières, 06/10 ») : ").strip() or "déposé (revue)"
                 self.orch.marquer_envoye(dossier.id, preuve)
                 self.bilan["deposees"] += 1

@@ -939,7 +939,7 @@ const cle = e => `${e.escalade}:${e.dossier ? e.dossier.etape : ""}`;
 const SURTITRES = { valider: "À relire et valider", depot: "À déposer", autre: "À traiter" };
 const LIBELLES_ALERTES = {
   quota: "Quota atteint", budget: "Budget LLM", source_coupee: "Source coupée", suivi: "Boîte mail", demarches: "Démarches",
-  relance: "Relance prévue", relance_manuelle: "Relance à faire", echec_envoi: "Échec d'envoi", erreur: "Erreur",
+  relance: "Relance prévue", relance_manuelle: "Relance à faire", a_faire: "À faire", sur_place: "Se présenter sur place", echec_envoi: "Échec d'envoi", erreur: "Erreur",
   deadline: "Date limite", complement_profil: "Profil à compléter", cv_pdf: "CV", information: "Information", demande_info: "Information",
 };
 const libelleAlerte = type => { const t = String(type || "").split(":")[0]; return LIBELLES_ALERTES[t] || t.replace(/_/g, " ") || "Alerte"; };
@@ -1006,10 +1006,11 @@ function creerCarte(e) {
   if (d.critique.iteration) badges.push(el("span", { class: "badge " + (d.critique.note >= 80 ? "ok" : "avert") }, `relecture ${Math.round(d.critique.note)}/100`));
   const brouillon = d.version && d.etape !== "depot";  // le destinataire figure alors dans les en-têtes du mail
   if (d.canal === "email" && !brouillon) badges.push(el("span", { class: "badge ok", title: d.destinataire }, `mail → ${d.destinataire}`));
+  else if (d.canal === "main_propre") badges.push(el("span", { class: "badge violet", title: d.destinataire }, "en main propre"));
   else if (d.canal && d.canal !== "email") badges.push(el("span", { class: "badge violet" }, "dépôt à la main"));
   if (d.demarche) badges.push(el("span", { class: "badge info", title: d.demarche }, "déjà en contact"));
   if (d.presentiel) badges.push(el("span", { class: "badge ok", title: `${d.presentiel.raison}${d.presentiel.adresse ? " — " + d.presentiel.adresse : ""}` },
-    `à déposer sur place · ${Math.round(d.presentiel.distance_km)} km`));
+    "à déposer sur place" + (d.presentiel.distance_km != null ? ` · ${Math.round(d.presentiel.distance_km)} km` : "")));
 
   const lien = d.url ? el("span", {}, " · ", el("a", { href: d.url, target: "_blank", rel: "noreferrer" },
     d.type === "spontanee" ? "fiche de l'entreprise ↗" : "voir l'offre ↗")) : "";
@@ -1061,7 +1062,10 @@ function creerCarte(e) {
     carte.append(el("details", {}, el("summary", {}, `Faits sourcés sur l'entreprise (${d.faits.length})`),
       el("ul", {}, d.faits.map(f => el("li", {}, f.texte, " — ", el("a", { href: f.source, target: "_blank", rel: "noreferrer" }, "source"))))));
 
-  if (d.etape === "depot") {
+  if (d.etape === "depot" && d.canal === "main_propre")
+    carte.append(el("div", { class: "depot place" }, "La tournée imprime la feuille de route, puis cette lettre, à joindre à ton CV. ",
+      el("a", { href: "#tournee", onclick: ev => { ev.preventDefault(); allerA("tournee"); } }, "Voir la tournée →")));
+  else if (d.etape === "depot") {
     carte.append(el("div", { class: "depot formulaire" },
       "Aucune adresse mail publique : « Remplir pour moi » ouvre sa page carrières, remplit le formulaire et joint le CV et la lettre. "
       + "Tu relis, puis tu cliques toi-même sur Envoyer. ",
@@ -1097,7 +1101,8 @@ function creerCarte(e) {
     }, consigne => agir(carte, { action: "reecrire", dossier: d.id, consigne }))),
     deposer: () => bouton("C'est déposé", "", () => tiroir(carte, {
       titre: "Où l'as-tu déposée ?", puces: ["site carrières", "formulaire de contact", "en main propre", "par courrier"],
-      remplacer: true, valeur: d.depot && d.depot.etat === "confirme" ? `site carrières (${d.depot.url})` : "site carrières",
+      remplacer: true, valeur: d.canal === "main_propre" ? "en main propre"
+        : d.depot && d.depot.etat === "confirme" ? `site carrières (${d.depot.url})` : "site carrières",
       libelle: "Enregistrer le dépôt", classe: "principal",
     }, preuve => agir(carte, { action: "deposer", dossier: d.id, preuve: `${preuve || "déposée"}, ${new Date().toLocaleDateString("fr-FR")}` }))),
     remplir: () => bouton("Remplir pour moi", "principal", () => agir(carte, { action: "remplir", dossier: d.id }, false)
@@ -1154,8 +1159,10 @@ async function suivreDepots() {
 
 function resume(e) {
   const d = e.dossier;
-  if (e.type === "validation_envoi") return d.canal === "email" ? "Prête à partir par mail : relis, corrige si besoin, puis valide." : "Prête : relis, puis valide pour la déposer toi-même.";
-  if (e.type === "depot_manuel") return "Validée : il reste à la déposer sur le site de l'entreprise.";
+  if (e.type === "validation_envoi") return d.canal === "email" ? "Prête à partir par mail : relis, corrige si besoin, puis valide."
+    : d.canal === "main_propre" ? "Prête : relis, puis valide pour l'apporter en main propre (onglet Tournée)." : "Prête : relis, puis valide pour la déposer toi-même.";
+  if (e.type === "depot_manuel") return d.canal === "main_propre" ? "Validée : à apporter en main propre, elle est dans l'onglet Tournée."
+    : "Validée : il reste à la déposer sur le site de l'entreprise.";
   return e.question;
 }
 

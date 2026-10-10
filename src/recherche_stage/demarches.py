@@ -3,12 +3,15 @@ envoyée à la main, contact rencontré sur un stand. Elles sont écrites dans
 `demarches.yaml` (à côté de config.yaml, jamais versionné : il contient des
 noms et des adresses de contacts).
 
-Elles servent à trois choses :
+Elles servent à quatre choses :
 - le tableau Excel de suivi en reçoit une ligne chacune ;
 - jamais de candidature spontanée automatique en double chez une entreprise où
   une démarche est en cours (une offre de cette entreprise reste proposée,
   marquée prioritaire, avec la démarche rappelée) ;
-- à la date de relance indiquée, un rappel apparaît dans la file d'attente.
+- une démarche « à faire » apparaît dans la file d'attente, et à la date de
+  relance indiquée, un rappel ;
+- « se présenter sur place » (`sur_place`) : la candidature est préparée pour le
+  site de l'entreprise le plus proche et entre dans la tournée.
 """
 
 from __future__ import annotations
@@ -38,11 +41,23 @@ class Demarche(BaseModel):
     activite: str = ""
     notes: str = ""
     relance: dt.date | None = None  # date du rappel dans la file d'attente
+    # Se présenter directement sur un site (statut a_faire) : candidature préparée pour le
+    # site le plus proche, trouvé dans l'annuaire, ou pour `adresse` si elle est donnée.
+    sur_place: bool = False
+    adresse: str = ""
 
     @property
     def bloque_spontanee(self) -> bool:
         """Une candidature spontanée automatique ferait doublon avec la démarche."""
         return self.statut != "contact"
+
+    @property
+    def depot_a_preparer(self) -> bool:
+        return self.sur_place and self.statut == "a_faire"
+
+    @property
+    def cle(self) -> str:
+        return f"{self.entreprise}|{self.date or ''}"
 
     def resume(self) -> str:
         quand = f" le {self.date:%d/%m/%Y}" if self.date else ""

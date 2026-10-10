@@ -111,8 +111,9 @@ def violations_criteres_durs(dossier: Dossier, grille: GrilleCriteres) -> tuple[
     if d.gratification_min and o.gratification is not None and o.gratification < d.gratification_min:
         violations.append(f"gratification {o.gratification} € < minimum {d.gratification_min} €")
 
-    exclues = {normaliser_entreprise(e) for e in d.entreprises_exclues}
-    if normaliser_entreprise(o.entreprise) in exclues:
+    # Tous les mots du nom exclu : « ArcelorMittal » écarte aussi « ArcelorMittal France » et ses autres sociétés.
+    mots = set(normaliser_entreprise(o.entreprise).split())
+    if any(exclue and exclue <= mots for exclue in (set(normaliser_entreprise(e).split()) for e in d.entreprises_exclues)):
         violations.append("entreprise exclue")
     intitule = normaliser(o.intitule)
     for mot in d.mots_exclus:
@@ -269,10 +270,13 @@ class AgentScoring(Agent):
         ne porte que sur les critères applicables, sans évaluation sémantique
         (il n'y a pas d'offre à comparer au profil)."""
         regles = score_regles(dossier, grille)
+        justification = "Candidature spontanée : score sur les critères secteur et lieu uniquement."
+        if dossier.offre.source == "demarche":
+            justification = "À déposer sur place, comme convenu lors de ta démarche : préparée quel que soit le score. " + justification
         dossier.score = Score(
             valeur=round(100 * regles, 1),
             confiance=0.7,
-            justification="Candidature spontanée : score sur les critères secteur et lieu uniquement.",
+            justification=justification,
             details={"regles": round(regles, 3)},
         )
         dossier.statut = Statut.scoree
@@ -296,7 +300,8 @@ class AgentScoring(Agent):
         from ..demarches import charger_si_change, correspondance
 
         demarche = correspondance(charger_si_change(self.ctx.config.suivi.demarches), o.entreprise, o.lieu)
-        if demarche and o.type == "spontanee" and demarche.bloque_spontanee:
+        # Hors la candidature que la démarche elle-même a fait préparer (« se présenter sur place »).
+        if demarche and o.type == "spontanee" and demarche.bloque_spontanee and o.source != "demarche":
             return self._abandonner(dossier, f"deja_en_contact : {demarche.entreprise}, {demarche.resume()}", entrees)
         if demarche:  # une offre chez une entreprise déjà rencontrée : à regarder en premier, et toujours par toi
             dossier.prioritaire = True

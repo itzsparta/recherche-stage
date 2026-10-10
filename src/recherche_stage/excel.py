@@ -211,7 +211,8 @@ def a_exporter(d: Dossier) -> bool:
 
 def valeurs(d: Dossier) -> dict[str, object]:
     o = d.offre
-    canal = {"email": "Mail", "formulaire": "Site de l'entreprise", "plateforme": o.source}.get(d.envoi.canal or "", "")
+    canal = {"email": "Mail", "formulaire": "Site de l'entreprise", "plateforme": o.source,
+             "main_propre": "En main propre"}.get(d.envoi.canal or "", "")
     envoi = d.envoi.horodatage
     return {
         "entreprise": nom_entreprise(o.entreprise),

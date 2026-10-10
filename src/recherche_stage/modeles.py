@@ -150,7 +150,7 @@ class Critique(BaseModel):
 
 
 class Envoi(BaseModel):
-    canal: Literal["email", "formulaire", "plateforme"] | None = None
+    canal: Literal["email", "formulaire", "plateforme", "main_propre"] | None = None
     horodatage: datetime | None = None
     preuve: str = ""
     # Ajouts

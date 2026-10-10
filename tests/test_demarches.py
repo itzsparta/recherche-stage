@@ -5,7 +5,7 @@ import random
 from datetime import date, datetime
 
 import pytest
-from conftest import FauxExpediteur, evaluation_offre, offre
+from conftest import FauxExpediteur, FauxHttp, evaluation_critique, evaluation_offre, lettre, offre, sortie_redaction
 from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.datavalidation import DataValidation
 
@@ -13,8 +13,10 @@ from recherche_stage.agents.scoring import AgentScoring
 from recherche_stage.demarches import Demarche, ErreurDemarches, charger, correspondance
 from recherche_stage.excel import mettre_a_jour
 from recherche_stage.hachage import id_dossier
+from recherche_stage.interface import Application
 from recherche_stage.modeles import Dossier, Statut
 from recherche_stage.orchestrateur import Orchestrateur
+from recherche_stage.presentiel import distance_km
 
 FICHIER = """
 demarches:
@@ -105,9 +107,149 @@ def test_tableau_excel_et_rappel_de_relance(ctx, demarches, tmp_path, horloge):
     assert lignes["Engie / Enedis"][7] == "Forum AgoraJob (08/10/2026) : stand visité"
 
     o = Orchestrateur(ctx, [], FauxExpediteur(), rng=random.Random(0), dormir=lambda s: None)
-    assert o.rappeler_demarches() == 0  # le 5 octobre : pas encore
+    assert o.rappeler_demarches() == 1 and o.rappeler_demarches() == 0  # STEF « à faire », une fois ; relance pas encore due
+    a_faire = next(e for e in ctx.store.escalades_ouvertes() if e["type"] == "a_faire:STEF")
+    assert "se présenter directement" in a_faire["question"] and "sur_place: true" in a_faire["question"]
     horloge.instant = datetime(2026, 10, 9, 9, 0)
     assert o.rappeler_demarches() == 1 and o.rappeler_demarches() == 0  # un seul rappel par date
     rappel = next(e for e in ctx.store.escalades_ouvertes() if e["type"] == "relance:Assystem")
     assert "Relance prévue le 08/10/2026 : Assystem (Forum AgoraJob" in rappel["question"]
     assert Demarche(entreprise="X", statut="contact").bloque_spontanee is False
+
+
+class Annuaire(FauxHttp):
+    """Annuaire des entreprises : sociétés trouvées selon le département demandé."""
+
+    def __init__(self, par_departement: dict):
+        super().__init__()
+        self.par_departement = par_departement
+
+    def get_json(self, url, params=None, entetes=None):
+        self.requetes.append((url, params))
+        return {"results": self.par_departement.get((params or {}).get("departement"), [])}
+
+
+def societe(nom, commune, code_postal, point, etat="A"):
+    return {"nom_complet": nom, "siren": str(abs(hash(nom)) % 10**9), "activite_principale": "52.10A",
+            "tranche_effectif_salarie": "41",  # 500 salariés et plus
+            "matching_etablissements": [{"siret": f"{abs(hash(nom)) % 10**14}", "code_postal": code_postal,
+                                         "libelle_commune": commune, "adresse": f"ZI {commune} {code_postal}",
+                                         "latitude": str(point[0]), "longitude": str(point[1]), "etat_administratif": etat}]}
+
+
+LILLE, LESQUIN, ARRAS = (50.6292, 3.0573), (50.589, 3.111), (50.291, 2.777)
+
+
+def test_se_presenter_sur_place_prepare_la_candidature_de_la_tournee(ctx, tmp_path):
+    chemin = tmp_path / "demarches.yaml"
+    chemin.write_text("""
+demarches:
+  - {entreprise: STEF, statut: a_faire, date: 2026-10-08, canal: Forum AgoraJob, sur_place: true,
+     notes: "Plusieurs sites en Hauts-de-France ; se présenter directement sur un site"}
+  - {entreprise: Roquette, statut: a_faire, date: 2026-10-08, canal: Forum AgoraJob,
+     notes: Suivre les offres sur leur site carrière}
+""", encoding="utf-8")
+    ctx.config.suivi.demarches = str(chemin)
+    ctx.config.presentiel.domicile = "Lille"
+    ctx.store.definir_parametre("geo:lille", list(LILLE))
+    ctx.config.sources.annuaire_departements = ["59", "62"]
+    ctx.http = Annuaire({
+        "59": [societe("STEFANI MATERIAUX", "LILLE", "59000", LILLE),  # pas STEF : écartée
+               societe("STEF TRANSPORT LILLE", "LESQUIN", "59810", LESQUIN)],
+        "62": [societe("STEF LOGISTIQUE ARRAS", "ARRAS", "62000", ARRAS),
+               societe("STEF TRANSPORT CALAIS", "CALAIS", "62100", (50.95, 1.86), etat="F")],  # site fermé
+    })
+    stef = "STEF TRANSPORT LILLE"
+    ctx.config.llm.recherche_web = False
+    ctx.llm.reponses.update({
+        "enquete": {"activite": "Transport frigorifique", "activite_source": "", "faits": [], "contact_email": "",
+                    "contact_source": "", "fiable": True},
+        "redaction": sortie_redaction(lettre(entreprise=stef, intitule="Stage maintenance (candidature spontanée)"), mail=(
+            f"Bonjour,\n\nVeuillez trouver ci-joint ma candidature spontanée chez {stef} : mon CV et ma lettre de motivation. "
+            "Mon stage en maintenance préventive et ma pratique de la GMAO pourraient servir vos équipes.\n\n"
+            "Bien cordialement,\nCamille Martin\ncamille.martin@exemple.fr\n06 12 34 56 78")),
+        "critique": evaluation_critique(),
+    })
+    o = Orchestrateur(ctx, [], FauxExpediteur(), rng=random.Random(0), dormir=lambda s: None)
+    o.apprentissage.choisir_variante = lambda: "experience_terrain"
+    rapport = o.cycle(envoyer=False, suivre=False)
+    assert rapport["depots_demarches"] == 1 and rapport["enquetes"] == 1
+
+    [d] = ctx.store.lister()
+    assert (d.offre.entreprise, d.offre.source, d.offre.adresse, d.prioritaire) == (stef, "demarche", "ZI LESQUIN 59810", True)
+    # Grand groupe et score bas sur le secteur : préparée quand même, l'entreprise a demandé de passer.
+    assert d.presentiel.conseille and d.presentiel.raison.startswith("se présenter sur place, d'après ta démarche")
+    assert d.score.justification.startswith("À déposer sur place")
+    assert d.envoi.canal == "main_propre" and d.statut == Statut.en_attente_humain and d.etape_attente == "envoi"
+    d.fiche_entreprise.contact = "rh@stef.exemple"
+    assert o.envoi.choisir_canal(d) == ("main_propre", "ZI LESQUIN 59810")  # jamais par mail, même avec une adresse
+
+    alertes = {e["type"]: e["question"] for e in ctx.store.escalades_ouvertes() if not e["dossier_id"]}
+    km = distance_km(LILLE, LESQUIN), distance_km(LILLE, ARRAS)
+    assert f"le plus proche, {stef}, ZI LESQUIN 59810, à {km[0]:.0f} km" in alertes["sur_place:STEF"]
+    assert f"Autres sites : STEF LOGISTIQUE ARRAS (ARRAS (62000), {km[1]:.0f} km)." in alertes["sur_place:STEF"]
+    assert "CALAIS" not in alertes["sur_place:STEF"] and "a_faire:STEF" not in alertes
+    assert "rs detecter-ats" in alertes["a_faire:Roquette"]  # suivre leurs offres : comment les faire arriver ici
+
+    # Dans l'interface : sur la carte avant validation, puis arrêt de la tournée, déposée en main propre.
+    app = Application(lambda: (ctx, o), ouvrir=lambda chemin: None, arriere_plan=False)
+    [repere] = app.etat()["tournee"]["reperes"]
+    assert (repere["entreprise"], repere["etat"], repere["point"]) == (stef, "a_valider", LESQUIN)
+    app.action({"action": "valider", "dossier": d.id})
+    carte = next(e for e in app.etat()["file"] if e["dossier"] and e["dossier"]["id"] == d.id)
+    assert carte["dossier"]["etape"] == "depot" and carte["actions"] == ["deposer", "rejeter", "ouvrir"]  # ni robot ni site
+    assert [a["entreprise"] for a in app.etat()["tournee"]["arrets"]] == [stef]
+    app.action({"action": "deposer", "dossier": d.id, "preuve": "en main propre, 12/10/2026"})
+    d = ctx.store.get(d.id)
+    assert d.statut == Statut.envoyee and d.envoi.canal == "main_propre" and d.presentiel.depose_le  # cochée dans la tournée
+
+    requetes = len(ctx.http.requetes)
+    assert o.preparer_depots_demarches() == 0 and len(ctx.http.requetes) == requetes  # une seule fois par démarche
+
+
+def test_se_presenter_sur_place_adresse_donnee_ou_site_introuvable(ctx, tmp_path):
+    chemin = tmp_path / "demarches.yaml"
+    chemin.write_text("""
+demarches:
+  - {entreprise: Exemple Froid, statut: a_faire, sur_place: true, adresse: "1 rue du Port, 59140 Dunkerque"}
+  - {entreprise: Inconnue Logistique, statut: a_faire, sur_place: true}
+""", encoding="utf-8")
+    ctx.config.suivi.demarches = str(chemin)
+    ctx.config.presentiel.domicile = "Lille"
+    ctx.store.definir_parametre("geo:lille", list(LILLE))
+    ctx.store.definir_parametre("geo:1 rue du port, 59140 dunkerque", [51.03, 2.37])
+    ctx.http = Annuaire({})
+    o = Orchestrateur(ctx, [], FauxExpediteur(), rng=random.Random(0), dormir=lambda s: None)
+    assert o.preparer_depots_demarches() == 1
+    [d] = ctx.store.lister()
+    assert (d.offre.entreprise, d.offre.latitude, d.presentiel.distance_km) == ("Exemple Froid", 51.03, round(distance_km(LILLE, (51.03, 2.37)), 1))
+    assert [p for _, p in ctx.http.requetes] == [{"q": "Inconnue Logistique", "per_page": 25, "etat_administratif": "A"}]
+    [alerte] = [e for e in ctx.store.escalades_ouvertes() if e["type"] == "sur_place:Inconnue Logistique"]
+    assert "aucun de ses sites trouvé" in alerte["question"] and "adresse:" in alerte["question"]
+    assert o.preparer_depots_demarches() == 0 and len(ctx.http.requetes) == 1  # pas recherché à chaque cycle
+
+    # Le site est ajouté au fichier : nouvel essai.
+    chemin.write_text(chemin.read_text(encoding="utf-8").replace("sur_place: true}", 'sur_place: true, adresse: "2 quai Est, 59000 Lille"}'),
+                      encoding="utf-8")
+    assert o.preparer_depots_demarches() == 1
+
+
+def test_revue_depot_en_main_propre(ctx):
+    from recherche_stage.modeles import Presentiel
+    from recherche_stage.revue import Revue
+
+    o = Orchestrateur(ctx, [], FauxExpediteur(), rng=random.Random(0), dormir=lambda s: None)
+    site = "ZI LESQUIN 59810"
+    of = offre(entreprise="STEF TRANSPORT LILLE", intitule="Stage (candidature spontanée)", type="spontanee",
+               source="demarche", adresse=site)
+    d = Dossier(id=id_dossier(of.entreprise, of.intitule), offre=of, statut=Statut.en_attente_humain, etape_attente="depot")
+    d.envoi.canal, d.envoi.destinataire = "main_propre", site
+    d.presentiel = Presentiel(conseille=True, raison="se présenter sur place, d'après ta démarche", adresse=site)
+    ctx.store.save(d)
+    ctx.store.escalader(d.id, "depot_manuel", "Déposer la candidature en main propre")
+    entrees, sortie, ouverts = ["o", "d"], [], []
+    bilan = Revue(ctx, o, demander=lambda invite: entrees.pop(0), afficher=sortie.append, ouvrir=ouverts.append).executer()
+    assert bilan["deposees"] == 1 and f"À apporter en main propre chez STEF TRANSPORT LILLE : {site}" in "\n".join(sortie)
+    assert len(ouverts) == 1  # le dossier seulement : pas de recherche de page carrières
+    d = ctx.store.get(d.id)
+    assert d.statut == Statut.envoyee and d.presentiel.depose_le and d.envoi.canal == "main_propre"

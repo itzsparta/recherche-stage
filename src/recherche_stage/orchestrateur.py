@@ -25,11 +25,11 @@ from .agents.scoring import AgentScoring
 from .agents.suivi import AgentSuivi
 from .agents.veille import AgentVeille
 from .canaux.messagerie import Boite, Expediteur
-from .demarches import Demarche, ErreurDemarches
+from .demarches import Demarche, ErreurDemarches, correspondance
 from .demarches import charger as charger_demarches
 from .depot import lancement
 from .llm import BudgetEpuise, ErreurLLM, NonConnecte, QuotaEpuise
-from .modeles import Critique, Dossier, Envoi, Statut
+from .modeles import Critique, Dossier, Envoi, Offre, Statut
 from .reseau import ErreurReseau
 from .sites import site_tiers
 from .sources import Source
@@ -158,6 +158,8 @@ class Orchestrateur:
             self.activite("veille")
             rapport["collectees"] += len(self.veille.executer())
             self.activite("veille", "ok")
+        if nouvelles_candidatures:
+            rapport["depots_demarches"] += self.preparer_depots_demarches()
 
         profil, grille = self.ctx.profil(), self.ctx.grille()
         # `filtree` : scoring interrompu par une erreur au cycle précédent, on le reprend.
@@ -170,7 +172,8 @@ class Orchestrateur:
         if nouvelles_candidatures:
             candidats = [
                 d for d in self.store.lister([Statut.scoree])
-                if d.score.valeur >= seuil and (d.score.confiance >= seuil_confiance or "scoring" in d.valide_humain)
+                if (d.score.valeur >= seuil or d.offre.source == "demarche")  # sur place : convenu avec l'entreprise
+                and (d.score.confiance >= seuil_confiance or "scoring" in d.valide_humain)
             ]
             candidats.sort(key=lambda d: (d.prioritaire, d.score.valeur), reverse=True)
             retenus = candidats[: min(self.capacite(), par_cycle)]
@@ -233,11 +236,10 @@ class Orchestrateur:
         from .excel import a_exporter
         from .presentiel import evaluer, geocoder
 
-        a_juger = [d for d in self.store.lister() if d.presentiel is None and a_exporter(d)]
+        a_juger = [d for d in self.store.lister() if d.presentiel is None and (a_exporter(d) or d.offre.source == "demarche")]
         if not a_juger:
             return 0
-        depart = params.domicile or self.ctx.profil().identite.ville
-        domicile = geocoder(self.ctx.http, self.store, depart) if depart else None
+        domicile = self._domicile()
         if domicile is None:
             self.progres("Dépôt en présentiel non évalué : indiquer presentiel.domicile dans config.yaml")
             return 0
@@ -255,6 +257,94 @@ class Orchestrateur:
             self.store.save(d)
         return conseilles
 
+    def _domicile(self):
+        """Coordonnées du point de départ des tournées (presentiel.domicile, sinon la ville du CV)."""
+        from .presentiel import geocoder
+
+        depart = self.ctx.config.presentiel.domicile or self.ctx.profil().identite.ville
+        return geocoder(self.ctx.http, self.store, depart) if depart else None
+
+    def preparer_depots_demarches(self) -> int:
+        """Démarches « se présenter sur place » (sur_place, statut a_faire) : prépare la
+        candidature spontanée pour le site de l'entreprise le plus proche, trouvé dans
+        l'annuaire (ou à l'adresse donnée). Elle passe en priorité, sans seuil de score,
+        ne part jamais par mail et rejoint la tournée. Une seule fois par démarche."""
+        faites: dict = self.store.parametre("depots_demarches", {}) or {}
+        a_preparer = [dm for dm in self.demarches() if dm.depot_a_preparer and f"{dm.cle}|{dm.adresse}" not in faites]
+        if not a_preparer:
+            return 0
+        from .excel import _departement
+        from .hachage import id_dossier
+        from .presentiel import distance_km, evaluer, geocoder
+        from .sources.annuaire import intitule_spontanee, sites
+
+        domicile = self._domicile()
+        crees = 0
+        for dm in a_preparer:
+            cle = f"{dm.cle}|{dm.adresse}"
+            try:
+                if dm.adresse:
+                    point = geocoder(self.ctx.http, self.store, dm.adresse)
+                    candidats = [{"entreprise": dm.entreprise, "siren": "", "lieu": dm.lieu or dm.adresse, "adresse": dm.adresse,
+                                  "latitude": point[0] if point else None, "longitude": point[1] if point else None}]
+                else:
+                    departement = _departement(dm.lieu)
+                    departements = [departement] if departement else self.ctx.config.sources.annuaire_departements
+                    candidats = [s for s in sites(self.ctx.http, dm.entreprise, departements)
+                                 if correspondance([dm], s["entreprise"], s["lieu"])]
+            except ErreurReseau as e:
+                self.progres(f"Démarche {dm.entreprise} : sites non cherchés ({e}), nouvel essai au prochain cycle")
+                continue
+            quand = f" ({dm.canal or 'démarche'}{f' du {dm.date:%d/%m/%Y}' if dm.date else ''})"
+            if not candidats:
+                faites[cle] = ""
+                self._escalader(None, f"sur_place:{dm.entreprise}",
+                                f"Te présenter chez {dm.entreprise}{quand} : aucun de ses sites trouvé dans l'annuaire. "
+                                f"Indique celui que tu vises dans demarches.yaml (adresse: …) pour préparer la candidature.")
+                continue
+
+            def eloignement(s: dict) -> float:
+                if domicile is None or s["latitude"] is None or s["longitude"] is None:
+                    return float("inf")
+                return distance_km(domicile, (s["latitude"], s["longitude"]))
+
+            candidats.sort(key=eloignement)
+            site = candidats[0]
+            offre = Offre(
+                intitule=f"{intitule_spontanee(self.ctx.grille())} (candidature spontanée)",
+                entreprise=site["entreprise"], lieu=site["lieu"], adresse=site["adresse"],
+                latitude=site["latitude"], longitude=site["longitude"],
+                description="Candidature à apporter en main propre sur un site de l'entreprise.",
+                source="demarche", type="spontanee", secteur=site.get("activite"),
+                url=f"https://annuaire-entreprises.data.gouv.fr/entreprise/{site['siren']}" if site["siren"] else "",
+                tranche_effectif=site.get("tranche_effectif"),
+            )
+            dossier_id = id_dossier(offre.entreprise, offre.intitule)
+            existant = self.store.get(dossier_id)
+            remplacable = existant is None or existant.statut in (Statut.collectee, Statut.filtree, Statut.scoree) or (
+                existant.statut == Statut.abandonnee and existant.motif.startswith("deja_en_contact"))
+            faites[cle] = dossier_id
+            if self.store.etat_envoi(dossier_id) is not None or not remplacable:
+                continue  # déjà candidaté, en cours, ou écarté par toi : rien en double
+            dossier = Dossier(id=dossier_id, offre=offre, statut=Statut.collectee, prioritaire=True)
+            point = (site["latitude"], site["longitude"]) if site["latitude"] is not None else None
+            dossier.presentiel = evaluer(dossier, domicile, point, self.ctx.config.presentiel)
+            dossier.tracer(self.nom, "demarche_sur_place")
+            self.store.save(dossier)
+            crees += 1
+            km = f", à {eloignement(site):.0f} km" if eloignement(site) != float("inf") else ""
+            autres = "".join(f"{', ' if i else ' Autres sites : '}{s['entreprise']} ({s['lieu']}"
+                             + (f", {eloignement(s):.0f} km)" if eloignement(s) != float("inf") else ")")
+                             for i, s in enumerate(candidats[1:5]))
+            # Le rappel « à faire » de la démarche laisse la place à celui-ci, qui nomme le site.
+            self.store.fermer_escalades_globales((f"a_faire:{dm.entreprise}",), "candidature préparée pour un dépôt sur place")
+            self._escalader(None, f"sur_place:{dm.entreprise}",
+                            f"Te présenter chez {dm.entreprise}{quand} : candidature préparée pour le site le plus proche, "
+                            f"{site['entreprise']}, {site['adresse'] or site['lieu']}{km}. Une fois rédigée, elle arrive ici "
+                            f"pour validation, puis dans l'onglet Tournée.{autres + '.' if autres else ''}")
+        self.store.definir_parametre("depots_demarches", faites)
+        return crees
+
     def demarches(self) -> list[Demarche]:
         """Démarches faites hors de l'outil (demarches.yaml) ; un fichier invalide est signalé, pas bloquant."""
         try:
@@ -264,12 +354,24 @@ class Orchestrateur:
             return []
 
     def rappeler_demarches(self) -> int:
-        """Relances prévues dans demarches.yaml et arrivées à échéance : une alerte
-        chacune dans la file d'attente, une seule fois par date."""
+        """Démarches « à faire » (une fois chacune ; « se présenter sur place » a son
+        propre rappel, avec le site retenu) et relances arrivées à échéance (une fois
+        par date) : une alerte chacune dans la file d'attente."""
         aujourd_hui = self.ctx.horloge().date()
         faits = set(self.store.parametre("rappels_demarches", []) or [])
         nouveaux = 0
         for dm in self.demarches():
+            if dm.statut == "a_faire" and not dm.sur_place and f"a_faire|{dm.cle}" not in faits:
+                astuce = ""
+                if re.search(r"présenter|sur place|main propre|déposer", dm.notes, re.IGNORECASE):
+                    astuce = (" Pour que la candidature soit préparée et placée dans la tournée : ajouter "
+                              "sur_place: true à cette démarche dans demarches.yaml.")
+                elif re.search(r"offres|carri[eè]res?", dm.notes, re.IGNORECASE):
+                    astuce = (" Pour que leurs offres arrivent ici : rs detecter-ats <adresse de leur page carrières>, "
+                              "puis recopier la ligne proposée dans config.yaml.")
+                self._escalader(None, f"a_faire:{dm.entreprise}", f"À faire chez {dm.entreprise} : {dm.resume()}.{astuce}")
+                faits.add(f"a_faire|{dm.cle}")
+                nouveaux += 1
             cle = f"{dm.entreprise}|{dm.relance}"
             if dm.relance and dm.relance <= aujourd_hui and cle not in faits:
                 self._escalader(None, f"relance:{dm.entreprise}",
@@ -579,7 +681,7 @@ class Orchestrateur:
         dossier.presentiel.depose_le = maintenant
         dossier.tracer("humain", "depot_presentiel")
         if dossier.statut == Statut.validee or dossier.etape_attente == "depot":
-            dossier.envoi.canal = None  # ni mail ni site : en main propre
+            dossier.envoi.canal = "main_propre"
             lieu = f" ({dossier.presentiel.adresse})" if dossier.presentiel.adresse else ""
             self.envoi.marquer_envoye(dossier, f"déposée en main propre le {maintenant:%d/%m/%Y}{lieu}")
             dossier.etape_attente = ""
